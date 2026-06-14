@@ -1,0 +1,128 @@
+// Схема БД мини-CRM преподавателя танцев.
+// Прототип на SQLite; при деплое меняется только datasource на Postgres.
+// Статусы хранятся как строки (TEXT) — SQLite не поддерживает enum,
+// плюс это удобнее для бизнес-логики, которая со временем меняется.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Клиент (ученик)
+model Client {
+  id              Int       @id @default(autoincrement())
+  fullName        String
+  phone           String?
+  telegram        String?
+  instagram       String?
+  birthDate       DateTime?
+  firstContact    DateTime  @default(now()) // дата первого контакта
+  source          String? // источник (Instagram, сарафан, реклама…)
+  // lead | trial | active | expired | inactive | barter
+  status          String    @default("lead")
+  request         String? // с каким запросом пришёл (свободный текст)
+  // «Рекомендации для преподавателя» — НЕ диагнозы, а что учитывать на занятии
+  recommendations String?
+  lastVisitAt     DateTime? // дата последнего занятия (денормализовано для скорости)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  subscriptions Subscription[]
+  attendances   Attendance[]
+  notes         Note[]
+  goals         ClientGoal[]
+}
+
+/// Абонемент. Универсальная модель: любое число занятий (от 4),
+/// онлайн/офлайн, истекает по сроку или по занятиям.
+model Subscription {
+  id             Int       @id @default(autoincrement())
+  clientId       Int
+  client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type           String // online | offline
+  purchasedAt    DateTime  @default(now())
+  totalLessons   Int // куплено занятий
+  usedLessons    Int       @default(0) // использовано занятий
+  pricePerLesson Float     @default(0) // цена за одно занятие, ₽
+  expiresAt      DateTime // дата окончания срока (обычно +1.5 мес)
+  frozen         Boolean   @default(false)
+  frozenUntil    DateTime?
+  // active | ending | finished_lessons | finished_term | frozen
+  status         String    @default("active")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  attendances Attendance[]
+
+  @@index([clientId])
+}
+
+/// Занятие (одно событие в расписании)
+model Lesson {
+  id        Int      @id @default(autoincrement())
+  title     String? // напр. «Оффлайн группа»
+  type      String // online | offline
+  startsAt  DateTime // дата и время начала
+  capacity  Int? // сколько мест
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendances Attendance[]
+
+  @@index([startsAt])
+}
+
+/// Запись клиента на занятие + факт посещения.
+/// status: enrolled (записан) | present (была) | absent (не была)
+model Attendance {
+  id             Int           @id @default(autoincrement())
+  lessonId       Int
+  lesson         Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  clientId       Int
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status         String        @default("enrolled")
+  subscriptionId Int? // с какого абонемента списали занятие
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([lessonId, clientId])
+  @@index([clientId])
+  @@index([lessonId])
+}
+
+/// Журнал заметок преподавателя по клиенту
+model Note {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+/// Цели клиента (уверенность, работа с телом и т.п.)
+model ClientGoal {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+/// Расход (аренда зала и пр.) — для управленческого учёта
+model Expense {
+  id        Int      @id @default(autoincrement())
+  title     String
+  amount    Float
+  date      DateTime @default(now())
+  category  String? // аренда, реклама, прочее
+  createdAt DateTime @default(now())
+}

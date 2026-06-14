@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Наташа · кабинет преподавателя танцев
 
-## Getting Started
+Мини-CRM для преподавателя танцев. Ядро — **карточка клиента** и **управление абонементами**,
+а не воронка продаж. Главный экран показывает, кому пора продлевать и кто пропал.
 
-First, run the development server:
+## Что умеет (MVP)
+
+- **Дашборд** — «Требуют внимания» (мало занятий / скоро срок / был на пробном / пропал),
+  занятия на сегодня, финансы месяца и прогноз выручки.
+- **Клиенты** — список с фильтром по статусу и поиском; карточка с контактами,
+  статистикой (посещения, сумма покупок, последнее занятие), целями, заметками
+  и блоком «Рекомендации для преподавателя» (что учитывать на занятии, не диагнозы).
+- **Абонементы** — универсальная модель: любое число занятий (от 4), онлайн/офлайн,
+  истечение по занятиям или по сроку (~1.5 мес), заморозка. Остаток и статус считаются автоматически.
+- **Занятия и посещаемость** — создание занятия, запись клиентов, отметка «была / не была».
+  «Была» автоматически списывает 1 занятие с активного абонемента нужного типа.
+- **Финансы** — доходы (проданные абонементы), расходы (аренда и пр.), прибыль, средний чек.
+
+## Стек
+
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Tailwind CSS v4
+- Prisma 7 + SQLite (прототип) через driver adapter `better-sqlite3`
+- Шрифт Manrope (кириллица), mobile-first
+
+## Запуск
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db:push     # создать схему БД
+npm run db:seed     # засеять тестовыми клиентами
+npm run dev         # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Полезные команды
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Команда | Что делает |
+|---|---|
+| `npm run dev` | dev-сервер |
+| `npm run db:seed` | пересоздать тестовые данные |
+| `npm run db:reset` | сбросить БД и засеять заново |
+| `npm run db:studio` | визуальный редактор БД (Prisma Studio) |
+| `npm run build` | продакшн-сборка |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Структура
 
-## Learn More
+```
+prisma/schema.prisma     модель данных
+prisma/seed.ts           тестовые данные
+src/lib/db.ts            подключение к БД
+src/lib/domain.ts        бизнес-логика (статусы, остатки, напоминания)
+src/lib/queries.ts       запросы к БД
+src/lib/actions.ts       server actions (создание/изменение)
+src/app/                 страницы (дашборд, клиенты, занятия, финансы)
+src/components/          UI-компоненты
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Деплой (следующий шаг)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Для публикации (телефон + комп) переключаем SQLite на PostgreSQL:
+меняем `provider` в `prisma/schema.prisma` на `postgresql`, ставим адаптер
+`@prisma/adapter-pg`, заводим базу (напр. Neon/Supabase), деплоим на Vercel.
+Перед публичным доступом добавляем вход преподавателя (логин/пароль).
