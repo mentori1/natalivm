@@ -198,6 +198,63 @@ export async function deleteSubscription(fd: FormData) {
   }
 }
 
+/** Отметить/снять день посещения в календаре абонемента */
+export async function toggleVisit(subId: number, dateStr: string) {
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  if (isNaN(date.getTime()) || !subId) return;
+  const sub = await prisma.subscription.findUnique({ where: { id: subId } });
+  if (!sub) return;
+
+  const existing = await prisma.subscriptionVisit.findUnique({
+    where: { subscriptionId_date: { subscriptionId: subId, date } },
+  });
+
+  if (existing) {
+    await prisma.subscriptionVisit.delete({ where: { id: existing.id } });
+    const used = Math.max(0, sub.usedLessons - 1);
+    await prisma.subscription.update({
+      where: { id: subId },
+      data: { usedLessons: used, status: derivedSubStatus({ ...sub, usedLessons: used }) },
+    });
+  } else {
+    if (sub.usedLessons >= sub.totalLessons) return; // абонемент уже исчерпан
+    await prisma.subscriptionVisit.create({ data: { subscriptionId: subId, date } });
+    const used = sub.usedLessons + 1;
+    await prisma.subscription.update({
+      where: { id: subId },
+      data: { usedLessons: used, status: derivedSubStatus({ ...sub, usedLessons: used }) },
+    });
+  }
+  revalidatePath(`/subscriptions/${subId}`);
+  revalidatePath(`/clients/${sub.clientId}`);
+  revalidatePath("/");
+}
+
+/** Ручная правка числа использованных занятий */
+export async function setUsedLessons(fd: FormData) {
+  const id = num(fd, "id");
+  const n = num(fd, "used");
+  if (!id) return;
+  const sub = await prisma.subscription.findUnique({
+    where: { id },
+    include: {
+      visits: true,
+      attendances: { where: { status: "present" } },
+    },
+  });
+  if (!sub) return;
+  // не меньше уже записанных дат и не больше купленного
+  const datedCount = sub.visits.length + sub.attendances.length;
+  const used = Math.min(sub.totalLessons, Math.max(datedCount, n));
+  await prisma.subscription.update({
+    where: { id },
+    data: { usedLessons: used, status: derivedSubStatus({ ...sub, usedLessons: used }) },
+  });
+  revalidatePath(`/subscriptions/${id}`);
+  revalidatePath(`/clients/${sub.clientId}`);
+  revalidatePath("/");
+}
+
 // ─────────── Финансы (расходы) ───────────
 export async function addExpense(fd: FormData) {
   const title = str(fd, "title");

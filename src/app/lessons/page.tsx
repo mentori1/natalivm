@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { startOfDay } from "@/lib/queries";
 import { SUB_TYPE, formatDateTime, type SubType } from "@/lib/domain";
 import { Badge, Card, EmptyState, SectionTitle, buttonClass } from "@/components/ui";
 import { IconChevronRight, IconPlus, IconCalendar } from "@/components/icons";
@@ -9,16 +8,16 @@ export const dynamic = "force-dynamic";
 
 export default async function LessonsPage() {
   const now = new Date();
-  const dayStart = startOfDay(now);
 
   const lessons = await prisma.lesson.findMany({
     include: { attendances: true },
     orderBy: { startsAt: "asc" },
   });
 
-  const upcoming = lessons.filter((l) => l.startsAt >= dayStart);
+  // «Предстоящие» — те, что ещё не начались; начавшиеся уходят в «Прошедшие»
+  const upcoming = lessons.filter((l) => l.startsAt >= now);
   const past = lessons
-    .filter((l) => l.startsAt < dayStart)
+    .filter((l) => l.startsAt < now)
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
     .slice(0, 20);
 

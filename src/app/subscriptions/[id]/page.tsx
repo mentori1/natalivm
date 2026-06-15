@@ -5,6 +5,7 @@ import {
   freezeSubscription,
   unfreezeSubscription,
   deleteSubscription,
+  setUsedLessons,
 } from "@/lib/actions";
 import {
   SUB_TYPE,
@@ -21,6 +22,7 @@ import {
 import { Avatar, Badge, Card, SectionTitle, EmptyState } from "@/components/ui";
 import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
+import { VisitCalendar } from "@/components/VisitCalendar";
 import {
   IconArrowLeft,
   IconSnow,
@@ -49,8 +51,8 @@ export default async function SubscriptionPage({
       attendances: {
         where: { status: "present" },
         include: { lesson: true },
-        orderBy: { lesson: { startsAt: "desc" } },
       },
+      visits: { orderBy: { date: "desc" } },
     },
   });
   if (!sub) notFound();
@@ -61,7 +63,25 @@ export default async function SubscriptionPage({
     sub.totalLessons > 0
       ? Math.round((sub.usedLessons / sub.totalLessons) * 100)
       : 0;
-  const recorded = sub.attendances.length;
+
+  // даты отмеченных в календаре посещений (для подсветки)
+  const visitDates = sub.visits.map((v) => v.date.toISOString().slice(0, 10));
+
+  // объединённая история: занятия из расписания + отметки в календаре
+  const history = [
+    ...sub.attendances.map((a) => ({
+      key: `a${a.id}`,
+      date: a.lesson.startsAt,
+      label: a.lesson.title ?? "Занятие",
+    })),
+    ...sub.visits.map((v) => ({
+      key: `v${v.id}`,
+      date: v.date,
+      label: "Отмечено в календаре",
+    })),
+  ].sort((x, y) => y.date.getTime() - x.date.getTime());
+
+  const recorded = history.length;
   const untracked = Math.max(0, sub.usedLessons - recorded);
 
   return (
@@ -119,6 +139,36 @@ export default async function SubscriptionPage({
           <Row label="Действует до" value={formatDate(sub.expiresAt)} />
         </div>
       </Card>
+
+      {/* Отметить посещения: календарь + ручная правка */}
+      <section>
+        <SectionTitle>Отметить посещения</SectionTitle>
+        <Card className="space-y-5 p-5">
+          <VisitCalendar subId={sub.id} visitDates={visitDates} />
+
+          <div className="border-t border-line pt-4">
+            <form action={setUsedLessons} className="flex items-end gap-3">
+              <input type="hidden" name="id" value={sub.id} />
+              <Field label="Или поставить число вручную">
+                <Input
+                  name="used"
+                  type="number"
+                  min={0}
+                  max={sub.totalLessons}
+                  defaultValue={sub.usedLessons}
+                  className="w-28"
+                />
+              </Field>
+              <SubmitButton variant="soft" size="md">
+                Сохранить
+              </SubmitButton>
+            </form>
+            <p className="mt-1.5 text-xs text-muted">
+              Меньше числа отмеченных в календаре дней поставить нельзя.
+            </p>
+          </div>
+        </Card>
+      </section>
 
       {/* Заморозка */}
       <section>
@@ -183,28 +233,26 @@ export default async function SubscriptionPage({
         {recorded === 0 ? (
           <EmptyState
             icon={<IconCalendar className="size-8" />}
-            title="Пока нет отмеченных занятий"
+            title="Пока нет отмеченных дат"
             hint={
               untracked > 0
-                ? `Ранее списано ${pluralLessons(untracked)} без записи дат. Новые занятия появятся здесь, как отметишь «была» на занятии.`
-                : "Даты будут появляться здесь, когда отметишь посещение на занятии."
+                ? `Ранее списано ${pluralLessons(untracked)} без записи дат. Отметь дни в календаре выше — даты появятся здесь.`
+                : "Отметь дни в календаре выше — даты появятся здесь."
             }
           />
         ) : (
           <>
             <Card className="divide-y divide-line overflow-hidden p-0">
-              {sub.attendances.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-brand-soft text-brand-dark">
+              {history.map((h) => (
+                <div key={h.key} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-dark">
                     <IconClock className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-ink capitalize">
-                      {formatDateTime(a.lesson.startsAt)}
+                      {formatDateTime(h.date)}
                     </p>
-                    <p className="text-sm text-muted">
-                      {a.lesson.title ?? "Занятие"}
-                    </p>
+                    <p className="text-sm text-muted">{h.label}</p>
                   </div>
                 </div>
               ))}

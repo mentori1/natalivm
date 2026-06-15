@@ -58,8 +58,22 @@ model Subscription {
   updatedAt      DateTime  @updatedAt
 
   attendances Attendance[]
+  visits      SubscriptionVisit[]
 
   @@index([clientId])
+}
+
+/// Отмеченный день посещения по абонементу (ручная отметка в календаре,
+/// без привязки к занятию в расписании)
+model SubscriptionVisit {
+  id             Int          @id @default(autoincrement())
+  subscriptionId Int
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  date           DateTime // день посещения (00:00 UTC)
+  createdAt      DateTime     @default(now())
+
+  @@unique([subscriptionId, date])
+  @@index([subscriptionId])
 }
 
 /// Занятие (одно событие в расписании)

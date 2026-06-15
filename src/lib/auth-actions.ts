@@ -26,7 +26,7 @@ export async function login(
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 дней
+    maxAge: 60 * 60 * 24 * 365, // 1 год — запоминаем устройство
   });
   redirect("/");
 }
