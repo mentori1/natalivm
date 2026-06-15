@@ -4,7 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { logout } from "@/lib/auth-actions";
 import { IconHome, IconUsers, IconCalendar, IconWallet } from "./icons";
+
+const IconLogout = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3" />
+    <path d="M10 17l-5-5 5-5M5 12h11" />
+  </svg>
+);
 
 const NAV = [
   { href: "/", label: "Главная", Icon: IconHome, exact: true },
@@ -20,6 +38,11 @@ function isActive(pathname: string, href: string, exact?: boolean) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  // Страница входа — без меню и оболочки
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-[100dvh]">
@@ -46,8 +69,19 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="mt-auto px-2 text-xs text-muted/70">
-          Личный кабинет преподавателя
+        <div className="mt-auto space-y-2">
+          <form action={logout}>
+            <button
+              type="submit"
+              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:bg-black/5 hover:text-ink"
+            >
+              <IconLogout className="size-5" />
+              Выйти
+            </button>
+          </form>
+          <p className="px-2 text-xs text-muted/70">
+            Личный кабинет преподавателя
+          </p>
         </div>
       </aside>
 
@@ -77,6 +111,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          <form action={logout} className="flex flex-1">
+            <button
+              type="submit"
+              className="flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-muted"
+            >
+              <IconLogout className="size-6" />
+              Выйти
+            </button>
+          </form>
         </div>
       </nav>
     </div>
