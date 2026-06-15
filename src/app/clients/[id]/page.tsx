@@ -8,11 +8,11 @@ import {
   SUB_STATUS,
   SUB_TYPE,
   derivedSubStatus,
+  effectiveClientStatus,
   remaining,
   formatDate,
   formatMoney,
   pluralLessons,
-  type ClientStatus,
   type SubStatus,
   type SubType,
 } from "@/lib/domain";
@@ -51,7 +51,7 @@ export default async function ClientCardPage({
   });
   if (!client) notFound();
 
-  const meta = CLIENT_STATUS[client.status as ClientStatus];
+  const meta = CLIENT_STATUS[effectiveClientStatus(client.status, client.subscriptions)];
   const { visits, spent } = clientStats(client.subscriptions);
 
   return (

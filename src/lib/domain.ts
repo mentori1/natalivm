@@ -91,6 +91,34 @@ export function isUsable(sub: SubLike, now = new Date()): boolean {
   return s === "active" || s === "ending";
 }
 
+/**
+ * Фактический статус клиента: для active/expired считается по абонементам.
+ * Ручные статусы (лид, пробный, бартер, неактивный) не меняются.
+ */
+export function effectiveClientStatus(
+  storedStatus: string,
+  subs: SubLike[],
+  now = new Date(),
+): ClientStatus {
+  if (
+    storedStatus === "lead" ||
+    storedStatus === "trial" ||
+    storedStatus === "barter" ||
+    storedStatus === "inactive"
+  ) {
+    return storedStatus;
+  }
+  // есть рабочий или замороженный абонемент → активный
+  const hasLive = subs.some((s) => {
+    const st = derivedSubStatus(s, now);
+    return st === "active" || st === "ending" || st === "frozen";
+  });
+  if (hasLive) return "active";
+  // были абонементы, но все закончились → «абонемент закончился»
+  if (subs.length > 0) return "expired";
+  return storedStatus as ClientStatus;
+}
+
 // ───────────────────────── напоминания (дашборд) ─────────────────────────
 
 export type ReminderKind =

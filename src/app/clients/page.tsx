@@ -3,11 +3,10 @@ import { prisma } from "@/lib/db";
 import {
   CLIENT_STATUS,
   SUB_TYPE,
-  derivedSubStatus,
   isUsable,
   remaining,
   pluralLessons,
-  type ClientStatus,
+  effectiveClientStatus,
 } from "@/lib/domain";
 import { Avatar, Badge, Card, EmptyState, buttonClass } from "@/components/ui";
 import { IconChevronRight, IconPlus, IconUsers } from "@/components/icons";
@@ -32,14 +31,18 @@ export default async function ClientsPage({
   const { status = "all", q = "" } = await searchParams;
   const query = q.trim();
 
-  const clients = await prisma.client.findMany({
-    where: {
-      ...(status !== "all" ? { status } : {}),
-      ...(query ? { fullName: { contains: query } } : {}),
-    },
+  const all = await prisma.client.findMany({
+    where: { ...(query ? { fullName: { contains: query } } : {}) },
     include: { subscriptions: true },
-    orderBy: [{ status: "asc" }, { fullName: "asc" }],
+    orderBy: [{ fullName: "asc" }],
   });
+  // Статус считаем по абонементам и по нему же фильтруем
+  const clients = all
+    .map((c) => ({
+      ...c,
+      effStatus: effectiveClientStatus(c.status, c.subscriptions),
+    }))
+    .filter((c) => status === "all" || c.effStatus === status);
 
   return (
     <div className="space-y-6">
@@ -94,7 +97,7 @@ export default async function ClientsPage({
       ) : (
         <Card className="divide-y divide-line overflow-hidden p-0">
           {clients.map((c) => {
-            const meta = CLIENT_STATUS[c.status as ClientStatus];
+            const meta = CLIENT_STATUS[c.effStatus];
             const usable = c.subscriptions
               .filter((s) => isUsable(s))
               .sort((a, b) => remaining(a) - remaining(b))[0];
