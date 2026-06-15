@@ -25,7 +25,7 @@ export function SubscriptionForm({ clientId }: { clientId: number }) {
               type="number"
               min={4}
               step={1}
-              defaultValue={8}
+              defaultValue={4}
               required
             />
           </Field>
