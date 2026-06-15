@@ -130,12 +130,15 @@ export type ReminderKind =
   | "disappeared"
   | "trainer_upsell";
 
-export const SINGLE_VISIT_KIND: Record<
-  string,
-  { label: string; defaultAmount: number }
-> = {
-  trial: { label: "Пробное", defaultAmount: 1000 },
-  single: { label: "Разовое", defaultAmount: 2300 },
+export const SINGLE_VISIT_KIND: Record<string, { label: string }> = {
+  trial: { label: "Пробное" },
+  single: { label: "Разовое" },
+};
+
+/// Цена по умолчанию: [тип визита][формат]
+export const SINGLE_VISIT_PRICE: Record<string, Record<string, number>> = {
+  trial: { offline: 1000, online: 500 },
+  single: { offline: 2300, online: 2300 },
 };
 
 /// Прибыль преподавателя с продажи одного тренажёра, ₽

@@ -139,7 +139,10 @@ export default async function ClientCardPage({
 
       {/* Статистика */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Посещений всего" value={String(visits)} />
+        <Stat
+          label="Посещений всего"
+          value={String(visits + client.singleVisits.length)}
+        />
         <Stat label="Сумма покупок" value={formatMoney(spent + singleSpent)} />
         <Stat label="Последнее занятие" value={formatDate(client.lastVisitAt)} />
         <Stat label="Первый контакт" value={formatDate(client.firstContact)} />
