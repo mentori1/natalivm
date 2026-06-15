@@ -2,11 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { clientStats } from "@/lib/queries";
-import { addGoal, addNote, deleteGoal, deleteNote } from "@/lib/actions";
+import {
+  addGoal,
+  addNote,
+  deleteGoal,
+  deleteNote,
+  toggleTrainer,
+  deleteSingleVisit,
+} from "@/lib/actions";
 import {
   CLIENT_STATUS,
   SUB_STATUS,
   SUB_TYPE,
+  SINGLE_VISIT_KIND,
+  TRAINER_PROFIT,
   derivedSubStatus,
   effectiveClientStatus,
   remaining,
@@ -20,6 +29,7 @@ import { Avatar, Badge, Card, SectionTitle, buttonClass } from "@/components/ui"
 import { Field, Input, Textarea, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { SubscriptionForm } from "@/components/SubscriptionForm";
+import { SingleVisitForm } from "@/components/SingleVisitForm";
 import { DeleteClientButton } from "@/components/DeleteClientButton";
 import {
   IconArrowLeft,
@@ -45,6 +55,7 @@ export default async function ClientCardPage({
     where: { id: clientId },
     include: {
       subscriptions: { orderBy: { createdAt: "desc" } },
+      singleVisits: { orderBy: { date: "desc" } },
       notes: { orderBy: { createdAt: "desc" } },
       goals: { orderBy: { createdAt: "asc" } },
     },
@@ -53,6 +64,7 @@ export default async function ClientCardPage({
 
   const meta = CLIENT_STATUS[effectiveClientStatus(client.status, client.subscriptions)];
   const { visits, spent } = clientStats(client.subscriptions);
+  const singleSpent = client.singleVisits.reduce((s, v) => s + v.amount, 0);
 
   return (
     <div className="space-y-7">
@@ -128,7 +140,7 @@ export default async function ClientCardPage({
       {/* Статистика */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Посещений всего" value={String(visits)} />
-        <Stat label="Сумма покупок" value={formatMoney(spent)} />
+        <Stat label="Сумма покупок" value={formatMoney(spent + singleSpent)} />
         <Stat label="Последнее занятие" value={formatDate(client.lastVisitAt)} />
         <Stat label="Первый контакт" value={formatDate(client.firstContact)} />
       </div>
@@ -197,6 +209,82 @@ export default async function ClientCardPage({
             })}
           </div>
         )}
+      </section>
+
+      {/* Разовые и пробные посещения */}
+      <section>
+        <SectionTitle
+          action={
+            <Disclosure label="Визит">
+              <SingleVisitForm clientId={client.id} />
+            </Disclosure>
+          }
+        >
+          Разовые и пробные
+        </SectionTitle>
+        {client.singleVisits.length === 0 ? (
+          <Card className="p-5 text-sm text-muted">
+            Разовых и пробных визитов пока нет. Добавь — кнопкой выше.
+          </Card>
+        ) : (
+          <Card className="divide-y divide-line overflow-hidden p-0">
+            {client.singleVisits.map((v) => (
+              <div key={v.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-ink">
+                    {SINGLE_VISIT_KIND[v.kind]?.label ?? v.kind} ·{" "}
+                    {SUB_TYPE[v.type as SubType].short}
+                  </p>
+                  <p className="text-sm text-muted">
+                    {formatDate(v.date)} · {formatMoney(v.amount)}
+                  </p>
+                </div>
+                <form action={deleteSingleVisit}>
+                  <input type="hidden" name="id" value={v.id} />
+                  <input type="hidden" name="clientId" value={client.id} />
+                  <button
+                    type="submit"
+                    aria-label="Удалить визит"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted/50 hover:bg-red-50 hover:text-red-500"
+                  >
+                    <IconX className="size-4" />
+                  </button>
+                </form>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      {/* Тренажёр */}
+      <section>
+        <SectionTitle>Тренажёр</SectionTitle>
+        <Card
+          className={`flex items-center justify-between gap-3 p-5 ${
+            client.hasTrainer ? "border-green-200 bg-green-50/50" : ""
+          }`}
+        >
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">
+              {client.hasTrainer ? "Тренажёр куплен" : "Тренажёр не куплен"}
+            </p>
+            {client.hasTrainer && client.trainerPurchasedAt && (
+              <p className="mt-0.5 text-sm text-muted">
+                {formatDate(client.trainerPurchasedAt)} · прибыль{" "}
+                {formatMoney(TRAINER_PROFIT)}
+              </p>
+            )}
+          </div>
+          <form action={toggleTrainer}>
+            <input type="hidden" name="clientId" value={client.id} />
+            <SubmitButton
+              variant={client.hasTrainer ? "ghost" : "primary"}
+              size="sm"
+            >
+              {client.hasTrainer ? "Отменить" : "Отметить покупку"}
+            </SubmitButton>
+          </form>
+        </Card>
       </section>
 
       {/* Запрос клиента */}

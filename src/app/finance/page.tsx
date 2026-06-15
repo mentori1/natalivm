@@ -2,7 +2,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getDashboard, startOfMonth, endOfMonth } from "@/lib/queries";
 import { addExpense, deleteExpense } from "@/lib/actions";
-import { SUB_TYPE, formatMoney, formatDate, type SubType } from "@/lib/domain";
+import {
+  SUB_TYPE,
+  SINGLE_VISIT_KIND,
+  TRAINER_PROFIT,
+  formatMoney,
+  formatDate,
+  type SubType,
+} from "@/lib/domain";
 import { Card, SectionTitle } from "@/components/ui";
 import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
@@ -21,10 +28,47 @@ export default async function FinancePage() {
     include: { client: true },
     orderBy: { purchasedAt: "desc" },
   });
+  const singleVisits = await prisma.singleVisit.findMany({
+    where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+    include: { client: true },
+  });
+  const trainerClients = await prisma.client.findMany({
+    where: {
+      trainerPurchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) },
+    },
+  });
   const expenses = await prisma.expense.findMany({
     where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
     orderBy: { date: "desc" },
   });
+
+  // объединённый список доходов: абонементы + разовые/пробные + тренажёры
+  const income = [
+    ...subsThisMonth.map((s) => ({
+      key: `s${s.id}`,
+      clientId: s.clientId,
+      name: s.client.fullName,
+      desc: `${SUB_TYPE[s.type as SubType].label} · ${s.totalLessons} занятий · ${formatDate(s.purchasedAt)}`,
+      amount: s.totalLessons * s.pricePerLesson,
+      date: s.purchasedAt,
+    })),
+    ...singleVisits.map((v) => ({
+      key: `v${v.id}`,
+      clientId: v.clientId,
+      name: v.client.fullName,
+      desc: `${SINGLE_VISIT_KIND[v.kind]?.label ?? v.kind} · ${formatDate(v.date)}`,
+      amount: v.amount,
+      date: v.date,
+    })),
+    ...trainerClients.map((c) => ({
+      key: `t${c.id}`,
+      clientId: c.id,
+      name: c.fullName,
+      desc: `Тренажёр · ${c.trainerPurchasedAt ? formatDate(c.trainerPurchasedAt) : ""}`,
+      amount: TRAINER_PROFIT,
+      date: c.trainerPurchasedAt ?? now,
+    })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
     <div className="space-y-7">
@@ -60,29 +104,24 @@ export default async function FinancePage() {
       {/* Доходы — проданные абонементы */}
       <section>
         <SectionTitle>Доходы за месяц</SectionTitle>
-        {subsThisMonth.length === 0 ? (
+        {income.length === 0 ? (
           <Card className="p-5 text-sm text-muted">
-            В этом месяце абонементы ещё не продавались.
+            В этом месяце доходов ещё не было.
           </Card>
         ) : (
           <Card className="divide-y divide-line overflow-hidden p-0">
-            {subsThisMonth.map((s) => (
+            {income.map((i) => (
               <Link
-                key={s.id}
-                href={`/clients/${s.clientId}`}
+                key={i.key}
+                href={`/clients/${i.clientId}`}
                 className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-brand-tint"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-ink">
-                    {s.client.fullName}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {SUB_TYPE[s.type as SubType].label} · {s.totalLessons} занятий
-                    · {formatDate(s.purchasedAt)}
-                  </p>
+                  <p className="truncate font-medium text-ink">{i.name}</p>
+                  <p className="text-xs text-muted">{i.desc}</p>
                 </div>
-                <span className="font-semibold text-green-600">
-                  +{formatMoney(s.totalLessons * s.pricePerLesson)}
+                <span className="shrink-0 font-semibold text-green-600">
+                  +{formatMoney(i.amount)}
                 </span>
               </Link>
             ))}

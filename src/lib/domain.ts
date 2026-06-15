@@ -127,7 +127,19 @@ export type ReminderKind =
   | "ending_term"
   | "finished"
   | "trial_followup"
-  | "disappeared";
+  | "disappeared"
+  | "trainer_upsell";
+
+export const SINGLE_VISIT_KIND: Record<
+  string,
+  { label: string; defaultAmount: number }
+> = {
+  trial: { label: "Пробное", defaultAmount: 1000 },
+  single: { label: "Разовое", defaultAmount: 2300 },
+};
+
+/// Прибыль преподавателя с продажи одного тренажёра, ₽
+export const TRAINER_PROFIT = 3000;
 
 export interface Reminder {
   clientId: number;
@@ -143,6 +155,7 @@ export interface ClientForReminders {
   status: string;
   firstContact: Date;
   lastVisitAt: Date | null;
+  hasTrainer: boolean;
   subscriptions: SubLike[];
 }
 
@@ -233,6 +246,17 @@ export function buildReminders(
           severity: d >= 60 ? 1 : 3,
         });
       }
+    }
+
+    // Отходил 2+ абонемента, но не купил тренажёр — предложить
+    if (c.subscriptions.length >= 2 && !c.hasTrainer) {
+      out.push({
+        clientId: c.id,
+        clientName: c.fullName,
+        kind: "trainer_upsell",
+        message: `Прошёл ${c.subscriptions.length} абонемента — предложить тренажёр`,
+        severity: 2,
+      });
     }
   }
 

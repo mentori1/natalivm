@@ -29,6 +29,8 @@ model Client {
   // «Рекомендации для преподавателя» — НЕ диагнозы, а что учитывать на занятии
   recommendations String?
   lastVisitAt     DateTime? // дата последнего занятия (денормализовано для скорости)
+  hasTrainer      Boolean   @default(false) // купил ли тренажёр для танцев
+  trainerPurchasedAt DateTime? // когда купил тренажёр
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -36,6 +38,21 @@ model Client {
   attendances   Attendance[]
   notes         Note[]
   goals         ClientGoal[]
+  singleVisits  SingleVisit[]
+}
+
+/// Разовое или пробное посещение (без абонемента, оплата за визит)
+model SingleVisit {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now())
+  type      String // online | offline
+  kind      String // trial (пробное) | single (разовое)
+  amount    Float    @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
 }
 
 /// Абонемент. Универсальная модель: любое число занятий (от 4),

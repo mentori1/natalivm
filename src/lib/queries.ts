@@ -4,6 +4,7 @@ import {
   derivedSubStatus,
   isUsable,
   remaining,
+  TRAINER_PROFIT,
   type ClientForReminders,
 } from "@/lib/domain";
 
@@ -39,7 +40,7 @@ export async function getDashboard() {
   const now = new Date();
 
   const clients = await prisma.client.findMany({
-    include: { subscriptions: true },
+    include: { subscriptions: true, singleVisits: true },
   });
   const reminders = buildReminders(clients as ClientForReminders[], now);
 
@@ -69,10 +70,27 @@ export async function getDashboard() {
     };
   });
 
-  const revenueMonth = subsThisMonth.reduce(
+  const mStart = startOfMonth(now);
+  const mEnd = endOfMonth(now);
+  const inMonth = (d: Date) => d >= mStart && d <= mEnd;
+
+  const subsRevenue = subsThisMonth.reduce(
     (s, x) => s + x.totalLessons * x.pricePerLesson,
     0,
   );
+  const singleRevenue = clients.reduce(
+    (s, c) =>
+      s +
+      c.singleVisits
+        .filter((v) => inMonth(v.date))
+        .reduce((a, v) => a + v.amount, 0),
+    0,
+  );
+  const trainerRevenue =
+    clients.filter((c) => c.trainerPurchasedAt && inMonth(c.trainerPurchasedAt))
+      .length * TRAINER_PROFIT;
+
+  const revenueMonth = subsRevenue + singleRevenue + trainerRevenue;
   const expensesMonth = expenses._sum.amount ?? 0;
 
   // Все абонементы для метрик

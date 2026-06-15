@@ -257,6 +257,69 @@ export async function setUsedLessons(fd: FormData) {
   revalidatePath("/");
 }
 
+// ─────────── Разовые / пробные посещения ───────────
+export async function addSingleVisit(fd: FormData) {
+  const clientId = num(fd, "clientId");
+  if (!clientId) return;
+  const date = dateOrNull(fd, "date") ?? new Date();
+  const type = str(fd, "type") === "online" ? "online" : "offline";
+  const kind = str(fd, "kind") === "trial" ? "trial" : "single";
+  const amount = num(fd, "amount", 0);
+
+  await prisma.singleVisit.create({
+    data: { clientId, date, type, kind, amount },
+  });
+
+  // обновим дату последнего визита и статус «пробный», если это пробное без абонементов
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    include: { subscriptions: { select: { id: true } } },
+  });
+  if (client) {
+    const data: { lastVisitAt?: Date; status?: string } = {};
+    if (!client.lastVisitAt || client.lastVisitAt < date) data.lastVisitAt = date;
+    if (
+      kind === "trial" &&
+      client.subscriptions.length === 0 &&
+      client.status === "lead"
+    ) {
+      data.status = "trial";
+    }
+    if (Object.keys(data).length) {
+      await prisma.client.update({ where: { id: clientId }, data });
+    }
+  }
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/");
+}
+
+export async function deleteSingleVisit(fd: FormData) {
+  const id = num(fd, "id");
+  const clientId = num(fd, "clientId");
+  if (!id) return;
+  await prisma.singleVisit.delete({ where: { id } });
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/");
+}
+
+// ─────────── Тренажёр ───────────
+export async function toggleTrainer(fd: FormData) {
+  const clientId = num(fd, "clientId");
+  if (!clientId) return;
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) return;
+  const buying = !client.hasTrainer;
+  await prisma.client.update({
+    where: { id: clientId },
+    data: {
+      hasTrainer: buying,
+      trainerPurchasedAt: buying ? new Date() : null,
+    },
+  });
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/");
+}
+
 // ─────────── Финансы (расходы) ───────────
 export async function addExpense(fd: FormData) {
   const title = str(fd, "title");

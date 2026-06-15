@@ -23,6 +23,7 @@ const KIND: Record<ReminderKind, { label: string; tone: Tone }> = {
   finished: { label: "Закончился", tone: "red" },
   trial_followup: { label: "Пробное", tone: "violet" },
   disappeared: { label: "Пропал", tone: "slate" },
+  trainer_upsell: { label: "Тренажёр", tone: "green" },
 };
 
 const ruDate = new Intl.DateTimeFormat("ru-RU", {
