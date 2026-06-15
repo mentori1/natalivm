@@ -9,6 +9,7 @@ type ClientData = {
   telegram: string | null;
   instagram: string | null;
   source: string | null;
+  sourceDetail: string | null;
   status: string;
   request: string | null;
   recommendations: string | null;
@@ -68,6 +69,17 @@ export function ClientForm({
             </Select>
           </Field>
         </div>
+
+        <Field
+          label="От кого / детали источника"
+          hint="Имя блогера, канал, рекламная кампания — чтобы потом считать, кто привёл клиентов"
+        >
+          <Input
+            name="sourceDetail"
+            defaultValue={client?.sourceDetail ?? ""}
+            placeholder="Например: блогер @anna_fit"
+          />
+        </Field>
       </Card>
 
       <Card className="space-y-4 p-5">

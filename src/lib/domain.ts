@@ -47,9 +47,10 @@ export type Tone = "green" | "amber" | "red" | "slate" | "violet" | "blue";
 
 export const CLIENT_SOURCES = [
   "Instagram",
-  "Сарафан",
-  "Реклама",
   "Telegram",
+  "Сарафан",
+  "Блогер",
+  "Реклама",
   "Бартер",
   "Другое",
 ];

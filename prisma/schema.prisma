@@ -21,7 +21,8 @@ model Client {
   instagram       String?
   birthDate       DateTime?
   firstContact    DateTime  @default(now()) // дата первого контакта
-  source          String? // источник (Instagram, сарафан, реклама…)
+  source          String? // источник (Instagram, Telegram, сарафан, блогер…)
+  sourceDetail    String? // от кого именно: имя блогера, канал, кампания
   // lead | trial | active | expired | inactive | barter
   status          String    @default("lead")
   request         String? // с каким запросом пришёл (свободный текст)

@@ -50,10 +50,15 @@ export default async function ClientsPage({
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           Клиенты
         </h1>
-        <Link href="/clients/new" className={buttonClass("primary", "sm")}>
-          <IconPlus className="size-4" />
-          Добавить
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/sources" className={buttonClass("soft", "sm")}>
+            Источники
+          </Link>
+          <Link href="/clients/new" className={buttonClass("primary", "sm")}>
+            <IconPlus className="size-4" />
+            Добавить
+          </Link>
+        </div>
       </header>
 
       {/* Поиск */}

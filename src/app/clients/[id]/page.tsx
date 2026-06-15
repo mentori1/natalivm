@@ -74,7 +74,10 @@ export default async function ClientCardPage({
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               {meta && <Badge tone={meta.tone}>{meta.label}</Badge>}
               {client.source && (
-                <span className="text-xs text-muted">{client.source}</span>
+                <span className="text-xs text-muted">
+                  {client.source}
+                  {client.sourceDetail ? ` · ${client.sourceDetail}` : ""}
+                </span>
               )}
             </div>
           </div>
