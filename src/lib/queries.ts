@@ -38,24 +38,23 @@ export function clientStats(subs: {
 export async function getDashboard() {
   const now = new Date();
 
-  // Все запросы параллельно — меньше задержек (особенно с удалённой базой)
-  const [clients, todayLessonsRaw, subsThisMonth, expenses] = await Promise.all([
-    prisma.client.findMany({ include: { subscriptions: true } }),
-    prisma.lesson.findMany({
-      where: { startsAt: { gte: startOfDay(now), lte: endOfDay(now) } },
-      include: { attendances: true },
-      orderBy: { startsAt: "asc" },
-    }),
-    prisma.subscription.findMany({
-      where: { purchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
-    }),
-    prisma.expense.aggregate({
-      _sum: { amount: true },
-      where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
-    }),
-  ]);
-
+  const clients = await prisma.client.findMany({
+    include: { subscriptions: true },
+  });
   const reminders = buildReminders(clients as ClientForReminders[], now);
+
+  const todayLessonsRaw = await prisma.lesson.findMany({
+    where: { startsAt: { gte: startOfDay(now), lte: endOfDay(now) } },
+    include: { attendances: true },
+    orderBy: { startsAt: "asc" },
+  });
+  const subsThisMonth = await prisma.subscription.findMany({
+    where: { purchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+  });
+  const expenses = await prisma.expense.aggregate({
+    _sum: { amount: true },
+    where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+  });
 
   const todayLessons = todayLessonsRaw.map((l) => {
     const enrolled = l.attendances.filter((a) => a.status !== "absent").length;
