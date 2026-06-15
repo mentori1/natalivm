@@ -38,17 +38,25 @@ export function clientStats(subs: {
 export async function getDashboard() {
   const now = new Date();
 
-  const clients = await prisma.client.findMany({
-    include: { subscriptions: true },
-  });
+  // Все запросы параллельно — меньше задержек (особенно с удалённой базой)
+  const [clients, todayLessonsRaw, subsThisMonth, expenses] = await Promise.all([
+    prisma.client.findMany({ include: { subscriptions: true } }),
+    prisma.lesson.findMany({
+      where: { startsAt: { gte: startOfDay(now), lte: endOfDay(now) } },
+      include: { attendances: true },
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.subscription.findMany({
+      where: { purchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+    }),
+    prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+    }),
+  ]);
+
   const reminders = buildReminders(clients as ClientForReminders[], now);
 
-  // Занятия сегодня
-  const todayLessonsRaw = await prisma.lesson.findMany({
-    where: { startsAt: { gte: startOfDay(now), lte: endOfDay(now) } },
-    include: { attendances: true },
-    orderBy: { startsAt: "asc" },
-  });
   const todayLessons = todayLessonsRaw.map((l) => {
     const enrolled = l.attendances.filter((a) => a.status !== "absent").length;
     return {
@@ -62,18 +70,10 @@ export async function getDashboard() {
     };
   });
 
-  // Финансы
-  const subsThisMonth = await prisma.subscription.findMany({
-    where: { purchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
-  });
   const revenueMonth = subsThisMonth.reduce(
     (s, x) => s + x.totalLessons * x.pricePerLesson,
     0,
   );
-  const expenses = await prisma.expense.aggregate({
-    _sum: { amount: true },
-    where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
-  });
   const expensesMonth = expenses._sum.amount ?? 0;
 
   // Все абонементы для метрик
