@@ -2,14 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { clientStats } from "@/lib/queries";
-import {
-  addGoal,
-  addNote,
-  deleteGoal,
-  deleteNote,
-  deleteSubscription,
-  freezeSubscription,
-} from "@/lib/actions";
+import { addGoal, addNote, deleteGoal, deleteNote } from "@/lib/actions";
 import {
   CLIENT_STATUS,
   SUB_STATUS,
@@ -34,9 +27,9 @@ import {
   IconSend,
   IconHeart,
   IconShield,
-  IconSnow,
   IconX,
   IconPlus,
+  IconChevronRight,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -163,55 +156,39 @@ export default async function ClientCardPage({
                   : 0;
               return (
                 <Card key={s.id} className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-ink">
-                        {SUB_TYPE[s.type as SubType].label}
+                  <Link
+                    href={`/subscriptions/${s.id}`}
+                    className="-m-1 block rounded-xl p-1 transition-colors hover:bg-brand-tint"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-ink">
+                          {SUB_TYPE[s.type as SubType].label}
+                        </span>
+                        <Badge tone={SUB_STATUS[st as SubStatus].tone}>
+                          {SUB_STATUS[st as SubStatus].label}
+                        </Badge>
+                      </div>
+                      <span className="flex items-center gap-0.5 text-sm font-semibold text-brand-dark">
+                        осталось {left}
+                        <IconChevronRight className="size-4 text-muted/50" />
                       </span>
-                      <Badge tone={SUB_STATUS[st as SubStatus].tone}>
-                        {SUB_STATUS[st as SubStatus].label}
-                      </Badge>
                     </div>
-                    <span className="text-sm font-semibold text-brand-dark">
-                      осталось {left}
-                    </span>
-                  </div>
 
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-line">
-                    <div
-                      className="h-full rounded-full bg-brand transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-muted">
-                    Использовано {s.usedLessons} из {s.totalLessons} ·{" "}
-                    {s.pricePerLesson > 0
-                      ? formatMoney(s.totalLessons * s.pricePerLesson)
-                      : "бартер"}{" "}
-                    · до {formatDate(s.expiresAt)}
-                  </p>
-
-                  <div className="mt-3 flex gap-2">
-                    <form action={freezeSubscription}>
-                      <input type="hidden" name="id" value={s.id} />
-                      <input type="hidden" name="clientId" value={client.id} />
-                      <SubmitButton variant="ghost" size="sm">
-                        <IconSnow className="size-4" />
-                        {s.frozen ? "Разморозить" : "Заморозить"}
-                      </SubmitButton>
-                    </form>
-                    <form action={deleteSubscription}>
-                      <input type="hidden" name="id" value={s.id} />
-                      <input type="hidden" name="clientId" value={client.id} />
-                      <SubmitButton
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:bg-red-50"
-                      >
-                        Удалить
-                      </SubmitButton>
-                    </form>
-                  </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-line">
+                      <div
+                        className="h-full rounded-full bg-brand transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-muted">
+                      Использовано {s.usedLessons} из {s.totalLessons} ·{" "}
+                      {s.pricePerLesson > 0
+                        ? formatMoney(s.totalLessons * s.pricePerLesson)
+                        : "бартер"}{" "}
+                      · до {formatDate(s.expiresAt)}
+                    </p>
+                  </Link>
                 </Card>
               );
             })}

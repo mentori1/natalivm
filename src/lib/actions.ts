@@ -150,28 +150,52 @@ export async function createSubscription(fd: FormData) {
 
 export async function freezeSubscription(fd: FormData) {
   const id = num(fd, "id");
-  const clientId = num(fd, "clientId");
   if (!id) return;
   const sub = await prisma.subscription.findUnique({ where: { id } });
   if (!sub) return;
   await prisma.subscription.update({
     where: { id },
     data: {
-      frozen: !sub.frozen,
-      status: !sub.frozen ? "frozen" : "active",
+      frozen: true,
+      frozenUntil: dateOrNull(fd, "frozenUntil"),
+      freezeReason: strOrNull(fd, "freezeReason"),
+      status: "frozen",
     },
   });
-  revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/subscriptions/${id}`);
+  revalidatePath(`/clients/${sub.clientId}`);
+  revalidatePath("/");
+}
+
+export async function unfreezeSubscription(fd: FormData) {
+  const id = num(fd, "id");
+  if (!id) return;
+  const sub = await prisma.subscription.findUnique({ where: { id } });
+  if (!sub) return;
+  await prisma.subscription.update({
+    where: { id },
+    data: {
+      frozen: false,
+      frozenUntil: null,
+      freezeReason: null,
+      status: derivedSubStatus({ ...sub, frozen: false }),
+    },
+  });
+  revalidatePath(`/subscriptions/${id}`);
+  revalidatePath(`/clients/${sub.clientId}`);
   revalidatePath("/");
 }
 
 export async function deleteSubscription(fd: FormData) {
   const id = num(fd, "id");
-  const clientId = num(fd, "clientId");
   if (!id) return;
+  const sub = await prisma.subscription.findUnique({ where: { id } });
   await prisma.subscription.delete({ where: { id } });
-  revalidatePath(`/clients/${clientId}`);
   revalidatePath("/");
+  if (sub) {
+    revalidatePath(`/clients/${sub.clientId}`);
+    redirect(`/clients/${sub.clientId}`);
+  }
 }
 
 // ─────────── Финансы (расходы) ───────────

@@ -50,7 +50,8 @@ model Subscription {
   pricePerLesson Float     @default(0) // цена за одно занятие, ₽
   expiresAt      DateTime // дата окончания срока (обычно +1.5 мес)
   frozen         Boolean   @default(false)
-  frozenUntil    DateTime?
+  frozenUntil    DateTime? // до какого числа заморожен
+  freezeReason   String? // причина заморозки
   // active | ending | finished_lessons | finished_term | frozen
   status         String    @default("active")
   createdAt      DateTime  @default(now())
