@@ -102,10 +102,7 @@ function LessonRow({
           {past ? (
             <span className="font-semibold text-ink">{present} пришли</span>
           ) : (
-            <span className="text-muted">
-              записано {enrolled}
-              {lesson.capacity ? ` / ${lesson.capacity}` : ""}
-            </span>
+            <span className="text-muted">записано {enrolled}</span>
           )}
         </div>
         <IconChevronRight className="size-5 shrink-0 text-muted/50" />

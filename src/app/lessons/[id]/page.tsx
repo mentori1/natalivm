@@ -88,17 +88,18 @@ export default async function LessonPage({
         <div className="mt-4 flex gap-6">
           <div>
             <p className="text-xs text-muted">Записано</p>
-            <p className="text-lg font-bold text-ink">
-              {enrolled}
-              {lesson.capacity ? (
-                <span className="text-muted"> / {lesson.capacity}</span>
-              ) : null}
-            </p>
+            <p className="text-lg font-bold text-ink">{enrolled}</p>
           </div>
           <div>
             <p className="text-xs text-muted">Пришли</p>
             <p className="text-lg font-bold text-brand-dark">{present}</p>
           </div>
+          {lesson.capacity ? (
+            <div>
+              <p className="text-xs text-muted">Мест</p>
+              <p className="text-lg font-bold text-ink">{lesson.capacity}</p>
+            </div>
+          ) : null}
         </div>
       </Card>
 
