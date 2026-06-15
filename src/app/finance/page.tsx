@@ -6,6 +6,7 @@ import {
   SUB_TYPE,
   SINGLE_VISIT_KIND,
   TRAINER_PROFIT,
+  EXPENSE_CATEGORIES,
   formatMoney,
   formatDate,
   type SubType,
@@ -17,34 +18,67 @@ import { IconX, IconSparkle } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-const ruMonth = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
+const ruMonth = new Intl.DateTimeFormat("ru-RU", {
+  month: "long",
+  year: "numeric",
+});
+const monthKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
-export default async function FinancePage() {
+export default async function FinancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ m?: string }>;
+}) {
+  const { m } = await searchParams;
   const now = new Date();
+
+  // выбранный месяц (по умолчанию текущий)
+  let sel = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (m && /^\d{4}-\d{2}$/.test(m)) {
+    const [y, mo] = m.split("-").map(Number);
+    sel = new Date(y, mo - 1, 1);
+  }
+  const mStart = startOfMonth(sel);
+  const mEnd = endOfMonth(sel);
+  const prevDate = new Date(sel.getFullYear(), sel.getMonth() - 1, 1);
+  const nextDate = new Date(sel.getFullYear(), sel.getMonth() + 1, 1);
+  const canNext = monthKey(sel) < monthKey(now);
+
   const { finance } = await getDashboard();
 
-  const subsThisMonth = await prisma.subscription.findMany({
-    where: { purchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+  // категории для подсказок: готовые + уже использованные
+  const usedCats = await prisma.expense.findMany({
+    where: { category: { not: null } },
+    select: { category: true },
+    distinct: ["category"],
+  });
+  const categories = Array.from(
+    new Set([
+      ...EXPENSE_CATEGORIES,
+      ...usedCats.map((c) => c.category).filter((c): c is string => !!c),
+    ]),
+  );
+
+  // доходы и расходы за ВЫБРАННЫЙ месяц
+  const subsMonth = await prisma.subscription.findMany({
+    where: { purchasedAt: { gte: mStart, lte: mEnd } },
     include: { client: true },
-    orderBy: { purchasedAt: "desc" },
   });
   const singleVisits = await prisma.singleVisit.findMany({
-    where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+    where: { date: { gte: mStart, lte: mEnd } },
     include: { client: true },
   });
   const trainerClients = await prisma.client.findMany({
-    where: {
-      trainerPurchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) },
-    },
+    where: { trainerPurchasedAt: { gte: mStart, lte: mEnd } },
   });
   const expenses = await prisma.expense.findMany({
-    where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+    where: { date: { gte: mStart, lte: mEnd } },
     orderBy: { date: "desc" },
   });
 
-  // объединённый список доходов: абонементы + разовые/пробные + тренажёры
   const income = [
-    ...subsThisMonth.map((s) => ({
+    ...subsMonth.map((s) => ({
       key: `s${s.id}`,
       clientId: s.clientId,
       name: s.client.fullName,
@@ -66,47 +100,61 @@ export default async function FinancePage() {
       name: c.fullName,
       desc: `Тренажёр · ${c.trainerPurchasedAt ? formatDate(c.trainerPurchasedAt) : ""}`,
       amount: TRAINER_PROFIT,
-      date: c.trainerPurchasedAt ?? now,
+      date: c.trainerPurchasedAt ?? sel,
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const revenue = income.reduce((s, i) => s + i.amount, 0);
+  const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const profit = revenue - expensesTotal;
 
   return (
     <div className="space-y-7">
       <header>
-        <p className="text-sm text-muted capitalize">{ruMonth.format(now)}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           Финансы
         </h1>
+        {/* Переключатель месяцев */}
+        <div className="mt-3 flex items-center gap-2">
+          <Link
+            href={`/finance?m=${monthKey(prevDate)}`}
+            className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-black/5"
+            aria-label="Прошлый месяц"
+          >
+            ‹
+          </Link>
+          <span className="min-w-[150px] text-center font-semibold text-ink capitalize">
+            {ruMonth.format(sel)}
+          </span>
+          {canNext ? (
+            <Link
+              href={`/finance?m=${monthKey(nextDate)}`}
+              className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-black/5"
+              aria-label="Следующий месяц"
+            >
+              ›
+            </Link>
+          ) : (
+            <span className="flex size-9 items-center justify-center rounded-xl text-muted/30">
+              ›
+            </span>
+          )}
+        </div>
       </header>
 
-      {/* Главные метрики */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Big label="Выручка" value={formatMoney(finance.revenueMonth)} />
-        <Big label="Расходы" value={formatMoney(finance.expensesMonth)} />
-        <Big label="Прибыль" value={formatMoney(finance.profitMonth)} accent />
-        <Big label="Средний чек" value={formatMoney(finance.avgCheck)} />
-        <Big label="Активных клиентов" value={String(finance.activeClients)} />
-        <Big label="Ждут продления" value={String(finance.expectedRenewals)} />
+      {/* Итоги за выбранный месяц */}
+      <div className="grid grid-cols-3 gap-3">
+        <Big label="Выручка" value={formatMoney(revenue)} />
+        <Big label="Расходы" value={formatMoney(expensesTotal)} />
+        <Big label="Прибыль" value={formatMoney(profit)} accent />
       </div>
 
-      <Card className="flex items-start gap-3 p-5">
-        <IconSparkle className="mt-0.5 size-5 shrink-0 text-brand" />
-        <p className="text-sm text-ink">
-          Прогноз выручки следующего месяца при продлении{" "}
-          {finance.expectedRenewals} активных абонементов —{" "}
-          <b className="text-brand-dark">
-            {formatMoney(finance.potentialRevenue)}
-          </b>
-          .
-        </p>
-      </Card>
-
-      {/* Доходы — проданные абонементы */}
+      {/* Доходы за месяц */}
       <section>
         <SectionTitle>Доходы за месяц</SectionTitle>
         {income.length === 0 ? (
           <Card className="p-5 text-sm text-muted">
-            В этом месяце доходов ещё не было.
+            В этом месяце доходов не было.
           </Card>
         ) : (
           <Card className="divide-y divide-line overflow-hidden p-0">
@@ -129,7 +177,7 @@ export default async function FinancePage() {
         )}
       </section>
 
-      {/* Расходы */}
+      {/* Расходы за месяц */}
       <section>
         <SectionTitle
           action={
@@ -150,7 +198,16 @@ export default async function FinancePage() {
                       />
                     </Field>
                     <Field label="Категория">
-                      <Input name="category" placeholder="аренда" />
+                      <Input
+                        name="category"
+                        list="expense-cats"
+                        placeholder="Выбери или впиши свою"
+                      />
+                      <datalist id="expense-cats">
+                        {categories.map((c) => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
                     </Field>
                     <Field label="Дата">
                       <Input
@@ -171,9 +228,7 @@ export default async function FinancePage() {
           Расходы за месяц
         </SectionTitle>
         {expenses.length === 0 ? (
-          <Card className="p-5 text-sm text-muted">
-            Расходов пока нет.
-          </Card>
+          <Card className="p-5 text-sm text-muted">Расходов не было.</Card>
         ) : (
           <Card className="divide-y divide-line overflow-hidden p-0">
             {expenses.map((e) => (
@@ -208,6 +263,27 @@ export default async function FinancePage() {
           </Card>
         )}
       </section>
+
+      {/* Текущее состояние (не зависит от выбранного месяца) */}
+      <section>
+        <SectionTitle>Сейчас</SectionTitle>
+        <div className="grid grid-cols-3 gap-3">
+          <Big label="Средний чек" value={formatMoney(finance.avgCheck)} />
+          <Big label="Активных" value={String(finance.activeClients)} />
+          <Big label="Ждут продления" value={String(finance.expectedRenewals)} />
+        </div>
+        <Card className="mt-3 flex items-start gap-3 p-5">
+          <IconSparkle className="mt-0.5 size-5 shrink-0 text-brand" />
+          <p className="text-sm text-ink">
+            Прогноз выручки следующего месяца при продлении{" "}
+            {finance.expectedRenewals} активных абонементов —{" "}
+            <b className="text-brand-dark">
+              {formatMoney(finance.potentialRevenue)}
+            </b>
+            .
+          </p>
+        </Card>
+      </section>
     </div>
   );
 }
@@ -225,7 +301,7 @@ function Big({
     <Card className="px-4 py-4">
       <p className="text-xs font-medium text-muted">{label}</p>
       <p
-        className={`mt-1 text-xl font-bold tracking-tight ${accent ? "text-brand-dark" : "text-ink"}`}
+        className={`mt-1 text-lg font-bold tracking-tight ${accent ? "text-brand-dark" : "text-ink"}`}
       >
         {value}
       </p>

@@ -144,6 +144,14 @@ export const SINGLE_VISIT_PRICE: Record<string, Record<string, number>> = {
 /// Прибыль преподавателя с продажи одного тренажёра, ₽
 export const TRAINER_PROFIT = 3000;
 
+/// Готовые категории расходов (можно выбрать или вписать свою)
+export const EXPENSE_CATEGORIES = [
+  "Аренда зала",
+  "Оборудование",
+  "Реклама",
+  "Прочее",
+];
+
 export interface Reminder {
   clientId: number;
   clientName: string;
