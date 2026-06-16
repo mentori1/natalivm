@@ -55,6 +55,48 @@ export const CLIENT_SOURCES = [
   "Другое",
 ];
 
+// ───────────────────────── защита от дублей клиентов ─────────────────────────
+
+/** Телефон → последние 10 цифр: +7, 8, скобки и пробелы не мешают сравнению. */
+export function normalizePhone(v: string | null | undefined): string {
+  const digits = (v ?? "").replace(/\D/g, "");
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+/** Юзернейм (Telegram/Instagram) → без «@», в нижнем регистре. */
+export function normalizeHandle(v: string | null | undefined): string {
+  return (v ?? "").trim().replace(/^@+/, "").toLowerCase();
+}
+
+/** Найденный возможный дубль клиента (для предупреждения в форме). */
+export type DuplicateMatch = {
+  id: number;
+  fullName: string;
+  phone: string | null;
+  telegram: string | null;
+  reasons: string[]; // по чему совпало: «телефон», «Telegram», «Instagram»
+};
+
+/** Введённые в форму клиента значения — чтобы вернуть их при предупреждении. */
+export type ClientFormValues = {
+  fullName: string;
+  status: string;
+  source: string;
+  sourceDetail: string;
+  phone: string;
+  telegram: string;
+  instagram: string;
+  birthDate: string;
+  request: string;
+  recommendations: string;
+};
+
+/** Состояние формы клиента: либо чисто, либо найдены возможные дубли. */
+export type ClientFormState = {
+  duplicates: DuplicateMatch[];
+  values: ClientFormValues;
+} | null;
+
 // ───────────────────────── расчёты по абонементам ─────────────────────────
 
 const DAY = 24 * 60 * 60 * 1000;

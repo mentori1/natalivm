@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/actions";
-import { ClientForm } from "@/components/ClientForm";
+import { NewClientForm } from "@/components/NewClientForm";
 import { IconArrowLeft } from "@/components/icons";
 
 export default function NewClientPage() {
@@ -15,7 +14,7 @@ export default function NewClientPage() {
       <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
         Новый клиент
       </h1>
-      <ClientForm action={createClient} submitText="Создать клиента" />
+      <NewClientForm />
     </div>
   );
 }

@@ -3,10 +3,62 @@ import {
   buildReminders,
   derivedSubStatus,
   isUsable,
+  normalizeHandle,
+  normalizePhone,
   remaining,
   TRAINER_PROFIT,
   type ClientForReminders,
+  type DuplicateMatch,
 } from "@/lib/domain";
+
+/**
+ * Ищет уже заведённых клиентов, похожих на нового, по телефону / Telegram / Instagram.
+ * Имя НЕ сравниваем — оно может повторяться. Сравнение по нормализованным значениям
+ * (телефон без +7/8 и пробелов; юзернейм без «@» и регистра). excludeId — не сравнивать
+ * клиента с самим собой при редактировании.
+ */
+export async function findClientDuplicates(
+  fields: {
+    phone?: string | null;
+    telegram?: string | null;
+    instagram?: string | null;
+  },
+  excludeId?: number,
+): Promise<DuplicateMatch[]> {
+  const phone = normalizePhone(fields.phone);
+  const tg = normalizeHandle(fields.telegram);
+  const ig = normalizeHandle(fields.instagram);
+  if (!phone && !tg && !ig) return [];
+
+  const candidates = await prisma.client.findMany({
+    where: excludeId ? { id: { not: excludeId } } : undefined,
+    select: {
+      id: true,
+      fullName: true,
+      phone: true,
+      telegram: true,
+      instagram: true,
+    },
+  });
+
+  const matches: DuplicateMatch[] = [];
+  for (const c of candidates) {
+    const reasons: string[] = [];
+    if (phone && normalizePhone(c.phone) === phone) reasons.push("телефон");
+    if (tg && normalizeHandle(c.telegram) === tg) reasons.push("Telegram");
+    if (ig && normalizeHandle(c.instagram) === ig) reasons.push("Instagram");
+    if (reasons.length > 0) {
+      matches.push({
+        id: c.id,
+        fullName: c.fullName,
+        phone: c.phone,
+        telegram: c.telegram,
+        reasons,
+      });
+    }
+  }
+  return matches;
+}
 
 export function startOfDay(d: Date): Date {
   const x = new Date(d);

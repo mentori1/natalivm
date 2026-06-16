@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { derivedSubStatus, isUsable, remaining } from "@/lib/domain";
+import { findClientDuplicates } from "@/lib/queries";
+import {
+  derivedSubStatus,
+  isUsable,
+  remaining,
+  type ClientFormState,
+  type ClientFormValues,
+} from "@/lib/domain";
 
 // ─────────── вспомогательные ───────────
 function str(fd: FormData, key: string): string {
@@ -28,16 +35,49 @@ const DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_TERM_DAYS = 45; // абонемент живёт ~1.5 месяца
 
 // ─────────── Клиенты ───────────
-export async function createClient(fd: FormData) {
+
+/** Собрать введённые значения формы — чтобы вернуть их при предупреждении о дубле. */
+function clientValues(fd: FormData): ClientFormValues {
+  return {
+    fullName: str(fd, "fullName"),
+    status: str(fd, "status") || "lead",
+    source: str(fd, "source"),
+    sourceDetail: str(fd, "sourceDetail"),
+    phone: str(fd, "phone"),
+    telegram: str(fd, "telegram"),
+    instagram: str(fd, "instagram"),
+    birthDate: str(fd, "birthDate"),
+    request: str(fd, "request"),
+    recommendations: str(fd, "recommendations"),
+  };
+}
+
+// Сигнатура под useActionState: (предыдущее_состояние, данные_формы).
+export async function createClient(
+  _prev: ClientFormState,
+  fd: FormData,
+): Promise<ClientFormState> {
   const fullName = str(fd, "fullName");
-  if (!fullName) return;
+  if (!fullName) return null;
+
+  const phone = strOrNull(fd, "phone");
+  const telegram = strOrNull(fd, "telegram");
+  const instagram = strOrNull(fd, "instagram");
+
+  // Защита от дублей: если не нажали «всё равно создать» — сверяем по контактам.
+  if (str(fd, "force") !== "1") {
+    const duplicates = await findClientDuplicates({ phone, telegram, instagram });
+    if (duplicates.length > 0) {
+      return { duplicates, values: clientValues(fd) };
+    }
+  }
 
   const client = await prisma.client.create({
     data: {
       fullName,
-      phone: strOrNull(fd, "phone"),
-      telegram: strOrNull(fd, "telegram"),
-      instagram: strOrNull(fd, "instagram"),
+      phone,
+      telegram,
+      instagram,
       source: strOrNull(fd, "source"),
       sourceDetail: strOrNull(fd, "sourceDetail"),
       status: str(fd, "status") || "lead",
