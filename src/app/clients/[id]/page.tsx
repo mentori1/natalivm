@@ -263,30 +263,54 @@ export default async function ClientCardPage({
       <section>
         <SectionTitle>Тренажёр</SectionTitle>
         <Card
-          className={`flex items-center justify-between gap-3 p-5 ${
+          className={`p-5 ${
             client.hasTrainer ? "border-green-200 bg-green-50/50" : ""
           }`}
         >
-          <div className="min-w-0">
-            <p className="font-semibold text-ink">
-              {client.hasTrainer ? "Тренажёр куплен" : "Тренажёр не куплен"}
-            </p>
-            {client.hasTrainer && client.trainerPurchasedAt && (
-              <p className="mt-0.5 text-sm text-muted">
-                {formatDate(client.trainerPurchasedAt)} · прибыль{" "}
-                {formatMoney(client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)}
+          {client.hasTrainer ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-ink">Тренажёр куплен</p>
+                {client.trainerPurchasedAt && (
+                  <p className="mt-0.5 text-sm text-muted">
+                    {formatDate(client.trainerPurchasedAt)} · прибыль{" "}
+                    {formatMoney(client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)}
+                  </p>
+                )}
+              </div>
+              <form action={toggleTrainer}>
+                <input type="hidden" name="clientId" value={client.id} />
+                <SubmitButton variant="ghost" size="sm">
+                  Отменить
+                </SubmitButton>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="font-semibold text-ink">Тренажёр не куплен</p>
+              <form
+                action={toggleTrainer}
+                className="flex flex-wrap items-end gap-3"
+              >
+                <input type="hidden" name="clientId" value={client.id} />
+                <Field label="Прибыль с продажи, ₽">
+                  <Input
+                    name="trainerProfit"
+                    type="number"
+                    min={0}
+                    step={500}
+                    defaultValue={TRAINER_PROFIT_DEFAULT}
+                    className="w-36"
+                  />
+                </Field>
+                <SubmitButton size="sm">Отметить покупку</SubmitButton>
+              </form>
+              <p className="text-xs text-muted">
+                Сейчас цена 5000 ₽. Старые продажи были по 3000 ₽ — поставь 3000,
+                если вносишь старую покупку.
               </p>
-            )}
-          </div>
-          <form action={toggleTrainer}>
-            <input type="hidden" name="clientId" value={client.id} />
-            <SubmitButton
-              variant={client.hasTrainer ? "ghost" : "primary"}
-              size="sm"
-            >
-              {client.hasTrainer ? "Отменить" : "Отметить покупку"}
-            </SubmitButton>
-          </form>
+            </div>
+          )}
         </Card>
       </section>
 
