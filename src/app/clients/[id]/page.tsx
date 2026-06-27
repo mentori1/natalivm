@@ -15,7 +15,7 @@ import {
   SUB_STATUS,
   SUB_TYPE,
   SINGLE_VISIT_KIND,
-  TRAINER_PROFIT,
+  TRAINER_PROFIT_DEFAULT,
   derivedSubStatus,
   effectiveClientStatus,
   remaining,
@@ -274,7 +274,7 @@ export default async function ClientCardPage({
             {client.hasTrainer && client.trainerPurchasedAt && (
               <p className="mt-0.5 text-sm text-muted">
                 {formatDate(client.trainerPurchasedAt)} · прибыль{" "}
-                {formatMoney(TRAINER_PROFIT)}
+                {formatMoney(client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)}
               </p>
             )}
           </div>

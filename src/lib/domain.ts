@@ -183,8 +183,10 @@ export const SINGLE_VISIT_PRICE: Record<string, Record<string, number>> = {
   single: { offline: 2300, online: 2300 },
 };
 
-/// Прибыль преподавателя с продажи одного тренажёра, ₽
-export const TRAINER_PROFIT = 3000;
+/// Прибыль с НОВОЙ продажи тренажёра, ₽ (с 27.06.2026 — 5000, было 3000).
+/// У каждой продажи прибыль фиксируется в Client.trainerProfit в момент продажи,
+/// поэтому старые продажи остаются по своей цене и не пересчитываются.
+export const TRAINER_PROFIT_DEFAULT = 5000;
 
 /// Готовые категории расходов (можно выбрать или вписать свою)
 export const EXPENSE_CATEGORIES = [

@@ -5,7 +5,7 @@ import { addExpense, deleteExpense } from "@/lib/actions";
 import {
   SUB_TYPE,
   SINGLE_VISIT_KIND,
-  TRAINER_PROFIT,
+  TRAINER_PROFIT_DEFAULT,
   EXPENSE_CATEGORIES,
   formatMoney,
   formatDate,
@@ -99,7 +99,7 @@ export default async function FinancePage({
       clientId: c.id,
       name: c.fullName,
       desc: `Тренажёр · ${c.trainerPurchasedAt ? formatDate(c.trainerPurchasedAt) : ""}`,
-      amount: TRAINER_PROFIT,
+      amount: c.trainerProfit ?? TRAINER_PROFIT_DEFAULT,
       date: c.trainerPurchasedAt ?? sel,
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());

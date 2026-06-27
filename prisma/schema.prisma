@@ -31,6 +31,7 @@ model Client {
   lastVisitAt     DateTime? // дата последнего занятия (денормализовано для скорости)
   hasTrainer      Boolean   @default(false) // купил ли тренажёр для танцев
   trainerPurchasedAt DateTime? // когда купил тренажёр
+  trainerProfit   Int? // прибыль с этой продажи тренажёра, ₽ (фиксируется в момент продажи)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

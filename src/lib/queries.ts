@@ -6,7 +6,7 @@ import {
   normalizeHandle,
   normalizePhone,
   remaining,
-  TRAINER_PROFIT,
+  TRAINER_PROFIT_DEFAULT,
   type ClientForReminders,
   type DuplicateMatch,
 } from "@/lib/domain";
@@ -138,9 +138,9 @@ export async function getDashboard() {
         .reduce((a, v) => a + v.amount, 0),
     0,
   );
-  const trainerRevenue =
-    clients.filter((c) => c.trainerPurchasedAt && inMonth(c.trainerPurchasedAt))
-      .length * TRAINER_PROFIT;
+  const trainerRevenue = clients
+    .filter((c) => c.trainerPurchasedAt && inMonth(c.trainerPurchasedAt))
+    .reduce((s, c) => s + (c.trainerProfit ?? TRAINER_PROFIT_DEFAULT), 0);
 
   const revenueMonth = subsRevenue + singleRevenue + trainerRevenue;
   const expensesMonth = expenses._sum.amount ?? 0;

@@ -8,6 +8,7 @@ import {
   derivedSubStatus,
   isUsable,
   remaining,
+  TRAINER_PROFIT_DEFAULT,
   type ClientFormState,
   type ClientFormValues,
 } from "@/lib/domain";
@@ -354,6 +355,8 @@ export async function toggleTrainer(fd: FormData) {
     data: {
       hasTrainer: buying,
       trainerPurchasedAt: buying ? new Date() : null,
+      // прибыль фиксируем в момент продажи (новые — по текущей цене, старые не трогаем)
+      trainerProfit: buying ? TRAINER_PROFIT_DEFAULT : null,
     },
   });
   revalidatePath(`/clients/${clientId}`);
