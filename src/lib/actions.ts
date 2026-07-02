@@ -350,9 +350,9 @@ export async function toggleTrainer(fd: FormData) {
   const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) return;
   const buying = !client.hasTrainer;
-  // прибыль вводит преподаватель (по умолчанию текущая цена); фиксируется в момент продажи
-  const amount = num(fd, "trainerProfit", TRAINER_PROFIT_DEFAULT);
-  const profit = amount > 0 ? amount : TRAINER_PROFIT_DEFAULT;
+  // прибыль фиксируется в момент продажи, чтобы старые продажи не пересчитывались
+  const rawProfit = num(fd, "trainerProfit", TRAINER_PROFIT_DEFAULT);
+  const profit = rawProfit > 0 ? rawProfit : TRAINER_PROFIT_DEFAULT;
   await prisma.client.update({
     where: { id: clientId },
     data: {

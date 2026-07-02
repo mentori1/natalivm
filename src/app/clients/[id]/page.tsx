@@ -65,6 +65,9 @@ export default async function ClientCardPage({
   const meta = CLIENT_STATUS[effectiveClientStatus(client.status, client.subscriptions)];
   const { visits, spent } = clientStats(client.subscriptions);
   const singleSpent = client.singleVisits.reduce((s, v) => s + v.amount, 0);
+  const trainerSpent = client.hasTrainer
+    ? (client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)
+    : 0;
 
   return (
     <div className="space-y-7">
@@ -143,7 +146,10 @@ export default async function ClientCardPage({
           label="Посещений всего"
           value={String(visits + client.singleVisits.length)}
         />
-        <Stat label="Сумма покупок" value={formatMoney(spent + singleSpent)} />
+        <Stat
+          label="Сумма покупок"
+          value={formatMoney(spent + singleSpent + trainerSpent)}
+        />
         <Stat label="Последнее занятие" value={formatDate(client.lastVisitAt)} />
         <Stat label="Первый контакт" value={formatDate(client.firstContact)} />
       </div>
@@ -274,7 +280,9 @@ export default async function ClientCardPage({
                 {client.trainerPurchasedAt && (
                   <p className="mt-0.5 text-sm text-muted">
                     {formatDate(client.trainerPurchasedAt)} · прибыль{" "}
-                    {formatMoney(client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)}
+                    {formatMoney(
+                      client.trainerProfit ?? TRAINER_PROFIT_DEFAULT,
+                    )}
                   </p>
                 )}
               </div>
@@ -306,8 +314,7 @@ export default async function ClientCardPage({
                 <SubmitButton size="sm">Отметить покупку</SubmitButton>
               </form>
               <p className="text-xs text-muted">
-                Сейчас цена 5000 ₽. Старые продажи были по 3000 ₽ — поставь 3000,
-                если вносишь старую покупку.
+                Сейчас прибыль 5 000 ₽. Для старых покупок поставь 3 000 ₽.
               </p>
             </div>
           )}
