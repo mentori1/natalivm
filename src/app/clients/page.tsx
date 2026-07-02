@@ -7,13 +7,14 @@ import {
   remaining,
   pluralLessons,
   effectiveClientStatus,
+  type ClientStatus,
 } from "@/lib/domain";
 import { Avatar, Badge, Card, EmptyState, buttonClass } from "@/components/ui";
 import { IconChevronRight, IconPlus, IconUsers } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: { key: string; label: string }[] = [
+const FILTERS: { key: "all" | ClientStatus; label: string }[] = [
   { key: "all", label: "Все" },
   { key: "active", label: "Активные" },
   { key: "trial", label: "Пробные" },
@@ -21,6 +22,16 @@ const FILTERS: { key: string; label: string }[] = [
   { key: "lead", label: "Лиды" },
   { key: "barter", label: "Бартер" },
   { key: "inactive", label: "Неактивные" },
+];
+
+const SUMMARY: { key: "all" | ClientStatus; label: string; hint: string }[] = [
+  { key: "all", label: "Всего", hint: "в базе" },
+  { key: "lead", label: "Лиды", hint: "ещё не были" },
+  { key: "trial", label: "Пробные", hint: "были на пробном" },
+  { key: "active", label: "Активные", hint: "есть абонемент" },
+  { key: "expired", label: "Закончились", hint: "нужно продлить" },
+  { key: "barter", label: "Бартер", hint: "особый статус" },
+  { key: "inactive", label: "Неактивные", hint: "не ходят" },
 ];
 
 export default async function ClientsPage({
@@ -37,12 +48,24 @@ export default async function ClientsPage({
     orderBy: [{ fullName: "asc" }],
   });
   // Статус считаем по абонементам и по нему же фильтруем
-  const clients = all
-    .map((c) => ({
-      ...c,
-      effStatus: effectiveClientStatus(c.status, c.subscriptions),
-    }))
-    .filter((c) => status === "all" || c.effStatus === status);
+  const withStatus = all.map((c) => ({
+    ...c,
+    effStatus: effectiveClientStatus(c.status, c.subscriptions),
+  }));
+  const counts: Record<"all" | ClientStatus, number> = {
+    all: withStatus.length,
+    lead: 0,
+    trial: 0,
+    active: 0,
+    expired: 0,
+    inactive: 0,
+    barter: 0,
+  };
+  for (const c of withStatus) counts[c.effStatus] += 1;
+
+  const clients = withStatus.filter(
+    (c) => status === "all" || c.effStatus === status,
+  );
 
   return (
     <div className="space-y-6">
@@ -72,6 +95,48 @@ export default async function ClientsPage({
         />
       </form>
 
+      {/* Счётчики по статусам */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {SUMMARY.map((item) => {
+          const active = item.key === status;
+          const meta = item.key === "all" ? null : CLIENT_STATUS[item.key];
+          return (
+            <Link
+              key={item.key}
+              href={item.key === "all" ? "/clients" : `/clients?status=${item.key}`}
+              className={`rounded-2xl border p-3 transition-colors ${
+                active
+                  ? "border-brand bg-brand text-white"
+                  : "border-line bg-white hover:bg-brand-tint"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`text-xs font-semibold uppercase ${
+                    active ? "text-white/80" : "text-muted"
+                  }`}
+                >
+                  {item.label}
+                </span>
+                {meta && (
+                  <span
+                    className={`size-2 rounded-full ${
+                      active ? "bg-white/80" : "bg-brand/60"
+                    }`}
+                  />
+                )}
+              </div>
+              <p className="mt-1 text-2xl font-bold leading-none">
+                {counts[item.key]}
+              </p>
+              <p className={`mt-1 text-xs ${active ? "text-white/75" : "text-muted"}`}>
+                {item.hint}
+              </p>
+            </Link>
+          );
+        })}
+      </div>
+
       {/* Фильтр по статусу */}
       <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {FILTERS.map((f) => {
@@ -87,6 +152,13 @@ export default async function ClientsPage({
               }`}
             >
               {f.label}
+              <span
+                className={`ml-1 rounded-full px-1.5 text-xs ${
+                  active ? "bg-white/20 text-white" : "bg-black/5 text-muted"
+                }`}
+              >
+                {counts[f.key]}
+              </span>
             </Link>
           );
         })}
