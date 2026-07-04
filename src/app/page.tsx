@@ -35,6 +35,8 @@ const ruDate = new Intl.DateTimeFormat("ru-RU", {
 export default async function DashboardPage() {
   const { reminders, todayLessons, finance } = await getDashboard();
   const today = ruDate.format(new Date());
+  const visibleReminders = reminders.slice(0, 5);
+  const hiddenReminders = reminders.slice(5);
 
   return (
     <div className="space-y-8">
@@ -64,26 +66,24 @@ export default async function DashboardPage() {
           />
         ) : (
           <Card className="divide-y divide-line overflow-hidden p-0">
-            {reminders.map((r, i) => {
-              const meta = KIND[r.kind];
-              return (
-                <Link
-                  key={`${r.clientId}-${r.kind}-${i}`}
-                  href={`/clients/${r.clientId}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-tint"
-                >
-                  <Avatar name={r.clientName} size={42} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-ink">
-                      {r.clientName}
-                    </p>
-                    <p className="truncate text-sm text-muted">{r.message}</p>
-                  </div>
-                  <Badge tone={meta.tone}>{meta.label}</Badge>
-                  <IconChevronRight className="size-5 shrink-0 text-muted/50" />
-                </Link>
-              );
-            })}
+            {visibleReminders.map((r, i) => (
+              <ReminderRow key={`${r.clientId}-${r.kind}-${i}`} reminder={r} />
+            ))}
+            {hiddenReminders.length > 0 && (
+              <details>
+                <summary className="flex cursor-pointer list-none items-center justify-center px-4 py-3 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand-tint [&::-webkit-details-marker]:hidden">
+                  Показать ещё {hiddenReminders.length}
+                </summary>
+                <div className="divide-y divide-line border-t border-line">
+                  {hiddenReminders.map((r, i) => (
+                    <ReminderRow
+                      key={`${r.clientId}-${r.kind}-hidden-${i}`}
+                      reminder={r}
+                    />
+                  ))}
+                </div>
+              </details>
+            )}
           </Card>
         )}
       </section>
@@ -162,6 +162,33 @@ export default async function DashboardPage() {
         </Card>
       </section>
     </div>
+  );
+}
+
+function ReminderRow({
+  reminder,
+}: {
+  reminder: {
+    clientId: number;
+    clientName: string;
+    kind: ReminderKind;
+    message: string;
+  };
+}) {
+  const meta = KIND[reminder.kind];
+  return (
+    <Link
+      href={`/clients/${reminder.clientId}`}
+      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-tint"
+    >
+      <Avatar name={reminder.clientName} size={42} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-ink">{reminder.clientName}</p>
+        <p className="truncate text-sm text-muted">{reminder.message}</p>
+      </div>
+      <Badge tone={meta.tone}>{meta.label}</Badge>
+      <IconChevronRight className="size-5 shrink-0 text-muted/50" />
+    </Link>
   );
 }
 
