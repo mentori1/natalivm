@@ -325,9 +325,19 @@ export interface ClientForReminders {
   subscriptions: SubLike[];
 }
 
+const REMINDER_KIND_PRIORITY: Record<ReminderKind, number> = {
+  low_lessons: 1,
+  finished: 2,
+  ending_term: 3,
+  trial_followup: 4,
+  trainer_upsell: 5,
+  disappeared: 6,
+};
+
 /**
- * Строит список «Требуют внимания» по клиенту.
- * Один клиент может дать несколько напоминаний (напр. мало занятий + скоро срок).
+ * Строит список «Требуют внимания».
+ * На главную отдаём один самый важный повод на клиента, чтобы один человек
+ * не занимал несколько строк одновременно.
  */
 export function buildReminders(
   clients: ClientForReminders[],
@@ -426,7 +436,31 @@ export function buildReminders(
     }
   }
 
-  return out.sort((a, b) => a.severity - b.severity);
+  const bestByClient = new Map<number, Reminder>();
+  for (const reminder of out) {
+    const current = bestByClient.get(reminder.clientId);
+    if (!current || compareClientReminders(reminder, current) < 0) {
+      bestByClient.set(reminder.clientId, reminder);
+    }
+  }
+
+  return Array.from(bestByClient.values()).sort(compareReminders);
+}
+
+function compareClientReminders(a: Reminder, b: Reminder): number {
+  return (
+    REMINDER_KIND_PRIORITY[a.kind] - REMINDER_KIND_PRIORITY[b.kind] ||
+    a.severity - b.severity ||
+    a.clientName.localeCompare(b.clientName, "ru")
+  );
+}
+
+function compareReminders(a: Reminder, b: Reminder): number {
+  return (
+    a.severity - b.severity ||
+    REMINDER_KIND_PRIORITY[a.kind] - REMINDER_KIND_PRIORITY[b.kind] ||
+    a.clientName.localeCompare(b.clientName, "ru")
+  );
 }
 
 // ───────────────────────── форматирование ─────────────────────────

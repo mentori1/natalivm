@@ -291,6 +291,7 @@ export async function toggleVisit(subId: number, dateStr: string) {
       data: { usedLessons: used, status: derivedSubStatus({ ...sub, usedLessons: used }) },
     });
   }
+  await recomputeLastVisit(sub.clientId);
   revalidatePath(`/subscriptions/${subId}`);
   revalidatePath(`/clients/${sub.clientId}`);
   revalidatePath("/");
@@ -383,6 +384,7 @@ export async function deleteSingleVisit(fd: FormData) {
   const clientId = num(fd, "clientId");
   if (!id) return;
   await prisma.singleVisit.delete({ where: { id } });
+  await recomputeLastVisit(clientId);
   revalidatePath(`/clients/${clientId}`);
   revalidatePath("/");
 }
@@ -526,10 +528,16 @@ export async function unenrollClient(fd: FormData) {
   const id = num(fd, "id");
   const lessonId = num(fd, "lessonId");
   if (!id) return;
+  const att = await prisma.attendance.findUnique({
+    where: { id },
+    select: { clientId: true },
+  });
   // если запись потребляла занятие — сначала вернём его
   await refundIfConsumed(id);
   await prisma.attendance.delete({ where: { id } });
+  if (att) await recomputeLastVisit(att.clientId);
   revalidatePath(`/lessons/${lessonId}`);
+  if (att) revalidatePath(`/clients/${att.clientId}`);
   revalidatePath("/");
 }
 
@@ -614,15 +622,31 @@ async function refundIfConsumed(attendanceId: number) {
   });
 }
 
-/** lastVisitAt = дата самого позднего занятия со статусом «была». */
+/** lastVisitAt = самая поздняя дата фактического визита из всех источников. */
 async function recomputeLastVisit(clientId: number) {
-  const last = await prisma.attendance.findFirst({
+  const lastAttendance = await prisma.attendance.findFirst({
     where: { clientId, status: "present" },
     include: { lesson: true },
     orderBy: { lesson: { startsAt: "desc" } },
   });
+  const lastManualVisit = await prisma.subscriptionVisit.findFirst({
+    where: { subscription: { clientId } },
+    orderBy: { date: "desc" },
+  });
+  const lastSingleVisit = await prisma.singleVisit.findFirst({
+    where: { clientId },
+    orderBy: { date: "desc" },
+  });
+  const dates = [
+    lastAttendance?.lesson.startsAt,
+    lastManualVisit?.date,
+    lastSingleVisit?.date,
+  ].filter((d): d is Date => Boolean(d));
+  const last = dates.length > 0
+    ? dates.sort((a, b) => b.getTime() - a.getTime())[0]
+    : null;
   await prisma.client.update({
     where: { id: clientId },
-    data: { lastVisitAt: last?.lesson.startsAt ?? null },
+    data: { lastVisitAt: last },
   });
 }
