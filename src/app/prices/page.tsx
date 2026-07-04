@@ -4,13 +4,7 @@ import {
   updatePriceItem,
 } from "@/lib/actions";
 import { getPriceItems } from "@/lib/prices";
-import {
-  PRICE_KIND,
-  SUB_TYPE,
-  formatMoney,
-  type PriceKind,
-  type SubType,
-} from "@/lib/domain";
+import { formatMoney } from "@/lib/domain";
 import { Badge, Card, PageHeader, SectionTitle } from "@/components/ui";
 import { Field, Input, Select, SubmitButton } from "@/components/form";
 import { IconPlus, IconX } from "@/components/icons";
@@ -19,6 +13,8 @@ export const dynamic = "force-dynamic";
 
 export default async function PricesPage() {
   const prices = await getPriceItems();
+  const online = prices.filter((item) => item.type === "online");
+  const offline = prices.filter((item) => item.type === "offline");
 
   return (
     <div className="space-y-6">
@@ -38,46 +34,107 @@ export default async function PricesPage() {
             <PriceForm action={createPriceItem} submit="Добавить тариф" />
           </Card>
         </details>
-        <Card className="divide-y divide-line overflow-hidden p-0">
-          {prices.map((item) => (
-            <details key={item.id} className="group">
-              <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-tint [&::-webkit-details-marker]:hidden">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold leading-snug text-ink sm:text-base">
-                    {compactTitle(item)}
-                  </p>
-                </div>
-                {!item.active && <Badge tone="slate">Скрыт</Badge>}
-                <span className="shrink-0 text-xs font-semibold text-brand-dark">
-                  Изменить
-                </span>
-              </summary>
-              <div className="border-t border-line bg-white/70 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-ink">Редактирование</p>
-                  <form action={deletePriceItem}>
-                    <input type="hidden" name="id" value={item.id} />
-                    <button
-                      type="submit"
-                      aria-label="Удалить тариф"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted/50 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <IconX className="size-4" />
-                    </button>
-                  </form>
-                </div>
-                <PriceForm
-                  action={updatePriceItem}
-                  item={item}
-                  submit="Сохранить"
-                />
-              </div>
-            </details>
-          ))}
-        </Card>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PriceFormatGroup title="Онлайн" items={online} />
+          <PriceFormatGroup title="Офлайн" items={offline} />
+        </div>
       </section>
     </div>
   );
+}
+
+function PriceFormatGroup({
+  title,
+  items,
+}: {
+  title: string;
+  items: PriceItem[];
+}) {
+  const groups = [
+    {
+      title: "Индивидуальные",
+      items: items.filter((item) => isIndividual(item)),
+    },
+    {
+      title: "Групповые",
+      items: items.filter((item) => !isIndividual(item) && item.kind !== "trial"),
+    },
+    {
+      title: "Пробные",
+      items: items.filter((item) => item.kind === "trial"),
+    },
+  ].filter((group) => group.items.length > 0);
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="border-b border-line px-4 py-3">
+        <h3 className="text-lg font-bold text-ink">{title}</h3>
+      </div>
+      <div className="divide-y divide-line">
+        {groups.map((group) => (
+          <div key={group.title}>
+            <div className="bg-brand-tint px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase">
+              {group.title}
+            </div>
+            <div className="divide-y divide-line">
+              {group.items.map((item) => (
+                <PriceRow key={item.id} item={item} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function PriceRow({ item }: { item: PriceItem }) {
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-tint [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-snug text-ink sm:text-base">
+            {compactTitle(item)}
+          </p>
+        </div>
+        {!item.active && <Badge tone="slate">Скрыт</Badge>}
+        <span className="shrink-0 text-xs font-semibold text-brand-dark">
+          Изменить
+        </span>
+      </summary>
+      <div className="border-t border-line bg-white/70 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-ink">Редактирование</p>
+          <form action={deletePriceItem}>
+            <input type="hidden" name="id" value={item.id} />
+            <button
+              type="submit"
+              aria-label="Удалить тариф"
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted/50 hover:bg-red-50 hover:text-red-500"
+            >
+              <IconX className="size-4" />
+            </button>
+          </form>
+        </div>
+        <PriceForm action={updatePriceItem} item={item} submit="Сохранить" />
+      </div>
+    </details>
+  );
+}
+
+type PriceItem = {
+  id: number;
+  name: string;
+  kind: string;
+  type: string;
+  price: number;
+  minLessons: number | null;
+  active: boolean;
+  sortOrder: number;
+};
+
+function isIndividual(item: { name: string }) {
+  return item.name.toLowerCase().includes("индивиду");
 }
 
 function compactTitle(item: {
@@ -87,13 +144,11 @@ function compactTitle(item: {
   price: number;
   minLessons: number | null;
 }) {
-  const kind = PRICE_KIND[item.kind as PriceKind]?.label.toLowerCase() ?? item.kind;
-  const type = SUB_TYPE[item.type as SubType]?.label.toLowerCase() ?? item.type;
   const lessons =
     item.kind === "subscription" && item.minLessons
       ? ` от ${item.minLessons} занятий`
       : "";
-  return `${item.name}, ${kind} ${type}, ${formatMoney(item.price)}${lessons}`;
+  return `${item.name}, ${formatMoney(item.price)}${lessons}`;
 }
 
 function PriceForm({
