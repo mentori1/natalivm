@@ -45,6 +45,13 @@ export const IconWallet = (p: P) => (
   </svg>
 );
 
+export const IconTag = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4.5 12.5 11.8 5H19v7.2l-7.5 7.3a2 2 0 0 1-2.8 0l-4.2-4.2a2 2 0 0 1 0-2.8Z" />
+    <circle cx="15.7" cy="8.3" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const IconChevronRight = (p: P) => (
   <svg {...base} {...p}>
     <path d="M9 6l6 6-6 6" />

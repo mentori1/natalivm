@@ -50,6 +50,7 @@ model SingleVisit {
   date      DateTime @default(now())
   type      String // online | offline
   kind      String // trial (пробное) | single (разовое)
+  tariffName String? // название тарифа на момент продажи
   amount    Float    @default(0)
   createdAt DateTime @default(now())
 
@@ -63,6 +64,7 @@ model Subscription {
   clientId       Int
   client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   type           String // online | offline
+  tariffName     String? // название тарифа на момент продажи
   purchasedAt    DateTime  @default(now())
   totalLessons   Int // куплено занятий
   usedLessons    Int       @default(0) // использовано занятий
@@ -80,6 +82,23 @@ model Subscription {
   visits      SubscriptionVisit[]
 
   @@index([clientId])
+}
+
+/// Прайс-лист: тарифы, которые подставляются в новые продажи.
+/// Старые абонементы/визиты хранят свои суммы отдельно и не пересчитываются.
+model PriceItem {
+  id         Int      @id @default(autoincrement())
+  name       String
+  kind       String // subscription | single | trial
+  type       String // online | offline
+  price      Int
+  minLessons Int?
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([kind, type])
 }
 
 /// Отмеченный день посещения по абонементу (ручная отметка в календаре,

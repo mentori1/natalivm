@@ -9,6 +9,8 @@ import {
   isUsable,
   remaining,
   TRAINER_PROFIT_DEFAULT,
+  type PriceKind,
+  type SubType,
   type ClientFormState,
   type ClientFormValues,
 } from "@/lib/domain";
@@ -30,6 +32,17 @@ function dateOrNull(fd: FormData, key: string): Date | null {
   if (!v) return null;
   const d = new Date(v);
   return isNaN(d.getTime()) ? null : d;
+}
+
+function priceKind(fd: FormData): PriceKind {
+  const v = str(fd, "kind");
+  return v === "subscription" || v === "single" || v === "trial"
+    ? v
+    : "subscription";
+}
+
+function subType(fd: FormData): SubType {
+  return str(fd, "type") === "online" ? "online" : "offline";
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -161,22 +174,32 @@ export async function deleteGoal(fd: FormData) {
 // ─────────── Абонементы ───────────
 export async function createSubscription(fd: FormData) {
   const clientId = num(fd, "clientId");
-  const totalLessons = Math.max(1, num(fd, "totalLessons", 4));
   if (!clientId) return;
 
+  const priceItemId = num(fd, "priceItemId");
+  const priceItem = priceItemId
+    ? await prisma.priceItem.findUnique({ where: { id: priceItemId } })
+    : null;
+  const tariff =
+    priceItem?.kind === "subscription" && priceItem.active ? priceItem : null;
+  const minLessons = tariff?.minLessons ?? 4;
+  const totalLessons = Math.max(minLessons, num(fd, "totalLessons", 4));
   const purchasedAt = dateOrNull(fd, "purchasedAt") ?? new Date();
   const termDays = num(fd, "termDays", DEFAULT_TERM_DAYS) || DEFAULT_TERM_DAYS;
   const expiresAt =
     dateOrNull(fd, "expiresAt") ??
     new Date(purchasedAt.getTime() + termDays * DAY);
+  const type = tariff ? tariff.type : subType(fd);
+  const pricePerLesson = num(fd, "pricePerLesson", tariff?.price ?? 0);
 
   await prisma.subscription.create({
     data: {
       clientId,
-      type: str(fd, "type") === "online" ? "online" : "offline",
+      type,
+      tariffName: tariff ? tariff.name : strOrNull(fd, "tariffName"),
       totalLessons,
       usedLessons: 0,
-      pricePerLesson: num(fd, "pricePerLesson", 0),
+      pricePerLesson,
       purchasedAt,
       expiresAt,
       status: "active",
@@ -303,12 +326,33 @@ export async function addSingleVisit(fd: FormData) {
   const clientId = num(fd, "clientId");
   if (!clientId) return;
   const date = dateOrNull(fd, "date") ?? new Date();
-  const type = str(fd, "type") === "online" ? "online" : "offline";
-  const kind = str(fd, "kind") === "trial" ? "trial" : "single";
-  const amount = num(fd, "amount", 0);
+  const priceItemId = num(fd, "priceItemId");
+  const priceItem = priceItemId
+    ? await prisma.priceItem.findUnique({ where: { id: priceItemId } })
+    : null;
+  const tariff =
+    priceItem &&
+    priceItem.active &&
+    (priceItem.kind === "trial" || priceItem.kind === "single")
+      ? priceItem
+      : null;
+  const type = tariff ? tariff.type : subType(fd);
+  const kind = tariff
+    ? tariff.kind
+    : str(fd, "kind") === "trial"
+      ? "trial"
+      : "single";
+  const amount = num(fd, "amount", tariff?.price ?? 0);
 
   await prisma.singleVisit.create({
-    data: { clientId, date, type, kind, amount },
+    data: {
+      clientId,
+      date,
+      type,
+      kind,
+      tariffName: tariff ? tariff.name : strOrNull(fd, "tariffName"),
+      amount,
+    },
   });
 
   // обновим дату последнего визита и статус «пробный», если это пробное без абонементов
@@ -388,6 +432,55 @@ export async function deleteExpense(fd: FormData) {
   await prisma.expense.delete({ where: { id } });
   revalidatePath("/finance");
   revalidatePath("/");
+}
+
+// ─────────── Прайс ───────────
+export async function createPriceItem(fd: FormData) {
+  const kind = priceKind(fd);
+  const minLessons =
+    kind === "subscription" ? Math.max(1, num(fd, "minLessons", 4)) : null;
+
+  await prisma.priceItem.create({
+    data: {
+      name: str(fd, "name") || "Новый тариф",
+      kind,
+      type: subType(fd),
+      price: Math.max(0, num(fd, "price", 0)),
+      minLessons,
+      active: fd.get("active") === "on",
+      sortOrder: num(fd, "sortOrder", 100),
+    },
+  });
+  revalidatePath("/prices");
+}
+
+export async function updatePriceItem(fd: FormData) {
+  const id = num(fd, "id");
+  if (!id) return;
+  const kind = priceKind(fd);
+  const minLessons =
+    kind === "subscription" ? Math.max(1, num(fd, "minLessons", 4)) : null;
+
+  await prisma.priceItem.update({
+    where: { id },
+    data: {
+      name: str(fd, "name") || "Тариф",
+      kind,
+      type: subType(fd),
+      price: Math.max(0, num(fd, "price", 0)),
+      minLessons,
+      active: fd.get("active") === "on",
+      sortOrder: num(fd, "sortOrder", 100),
+    },
+  });
+  revalidatePath("/prices");
+}
+
+export async function deletePriceItem(fd: FormData) {
+  const id = num(fd, "id");
+  if (!id) return;
+  await prisma.priceItem.delete({ where: { id } });
+  revalidatePath("/prices");
 }
 
 // ─────────── Занятия ───────────

@@ -191,7 +191,7 @@ export default async function ClientsPage({
                   </p>
                   <p className="truncate text-sm text-muted">
                     {usable
-                      ? `${SUB_TYPE[usable.type as "online" | "offline"].label} · осталось ${pluralLessons(remaining(usable))}`
+                      ? `${SUB_TYPE[usable.type as "online" | "offline"].label}${usable.tariffName ? ` · ${usable.tariffName}` : ""} · осталось ${pluralLessons(remaining(usable))}`
                       : (c.telegram ?? c.phone ?? "без абонемента")}
                   </p>
                 </div>

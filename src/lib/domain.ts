@@ -45,6 +45,117 @@ export const SUB_TYPE: Record<SubType, { label: string; short: string }> = {
 
 export type Tone = "green" | "amber" | "red" | "slate" | "violet" | "blue";
 
+export type PriceKind = "subscription" | "single" | "trial";
+
+export const PRICE_KIND: Record<PriceKind, { label: string; short: string }> = {
+  subscription: { label: "Абонемент", short: "Абонемент" },
+  single: { label: "Разовое", short: "Разовое" },
+  trial: { label: "Пробное", short: "Пробное" },
+};
+
+export type PriceItemLike = {
+  name: string;
+  kind: PriceKind;
+  type: SubType;
+  price: number;
+  minLessons: number | null;
+  active: boolean;
+  sortOrder: number;
+};
+
+export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
+  {
+    name: "Групповой абонемент",
+    kind: "subscription",
+    type: "offline",
+    price: 1500,
+    minLessons: 4,
+    active: true,
+    sortOrder: 10,
+  },
+  {
+    name: "Групповой абонемент",
+    kind: "subscription",
+    type: "online",
+    price: 1200,
+    minLessons: 4,
+    active: true,
+    sortOrder: 20,
+  },
+  {
+    name: "Индивидуальный абонемент",
+    kind: "subscription",
+    type: "online",
+    price: 2600,
+    minLessons: 4,
+    active: true,
+    sortOrder: 30,
+  },
+  {
+    name: "Индивидуальный абонемент",
+    kind: "subscription",
+    type: "offline",
+    price: 5000,
+    minLessons: 4,
+    active: true,
+    sortOrder: 40,
+  },
+  {
+    name: "Пробное занятие",
+    kind: "trial",
+    type: "offline",
+    price: 1000,
+    minLessons: null,
+    active: true,
+    sortOrder: 50,
+  },
+  {
+    name: "Пробное занятие",
+    kind: "trial",
+    type: "online",
+    price: 500,
+    minLessons: null,
+    active: true,
+    sortOrder: 60,
+  },
+  {
+    name: "Разовое групповое занятие",
+    kind: "single",
+    type: "offline",
+    price: 2300,
+    minLessons: null,
+    active: true,
+    sortOrder: 70,
+  },
+  {
+    name: "Разовое групповое занятие",
+    kind: "single",
+    type: "online",
+    price: 2300,
+    minLessons: null,
+    active: true,
+    sortOrder: 80,
+  },
+  {
+    name: "Индивидуальное занятие",
+    kind: "single",
+    type: "online",
+    price: 3000,
+    minLessons: null,
+    active: true,
+    sortOrder: 90,
+  },
+  {
+    name: "Индивидуальное занятие",
+    kind: "single",
+    type: "offline",
+    price: 5500,
+    minLessons: null,
+    active: true,
+    sortOrder: 100,
+  },
+];
+
 export const CLIENT_SOURCES = [
   "Instagram",
   "Telegram",

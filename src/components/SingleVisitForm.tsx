@@ -2,37 +2,77 @@
 
 import { useState } from "react";
 import { addSingleVisit } from "@/lib/actions";
-import { SINGLE_VISIT_PRICE } from "@/lib/domain";
 import { Field, Input, Select, SubmitButton } from "@/components/form";
 import { Card } from "@/components/ui";
+import type { PriceOption } from "@/lib/prices";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function priceFor(kind: string, type: string): number {
-  return SINGLE_VISIT_PRICE[kind]?.[type] ?? 0;
-}
+export function SingleVisitForm({
+  clientId,
+  prices,
+}: {
+  clientId: number;
+  prices: PriceOption[];
+}) {
+  const options = prices.filter(
+    (p) => (p.kind === "trial" || p.kind === "single") && p.active,
+  );
+  const initial = options[0] ?? null;
+  const [priceItemId, setPriceItemId] = useState(initial?.id ?? 0);
+  const [kind, setKind] = useState(initial?.kind ?? "trial");
+  const [type, setType] = useState(initial?.type ?? "offline");
+  const [tariffName, setTariffName] = useState(initial?.name ?? "");
+  const [amount, setAmount] = useState(initial?.price ?? 1000);
 
-export function SingleVisitForm({ clientId }: { clientId: number }) {
-  const [kind, setKind] = useState("trial");
-  const [type, setType] = useState("offline");
-  const [amount, setAmount] = useState(priceFor("trial", "offline"));
+  function selectTariff(id: number) {
+    const selected = options.find((p) => p.id === id);
+    setPriceItemId(id);
+    if (!id) {
+      setTariffName("");
+      return;
+    }
+    if (!selected) return;
+    setKind(selected.kind);
+    setType(selected.type);
+    setTariffName(selected.name);
+    setAmount(selected.price);
+  }
 
   return (
     <Card className="p-4">
       <form action={addSingleVisit} className="space-y-4">
         <input type="hidden" name="clientId" value={clientId} />
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="type" value={type} />
+        <input type="hidden" name="tariffName" value={tariffName} />
 
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Тариф">
+            <Select
+              name="priceItemId"
+              value={priceItemId}
+              onChange={(e) => selectTariff(Number(e.target.value))}
+            >
+              <option value={0}>Вручную</option>
+              {options.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.kind === "trial" ? "Пробное" : "Разовое"} ·{" "}
+                  {p.type === "online" ? "Онлайн" : "Офлайн"} · {p.name} ·{" "}
+                  {p.price.toLocaleString("ru-RU")} ₽
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Тип визита">
             <Select
-              name="kind"
               value={kind}
               onChange={(e) => {
-                const k = e.target.value;
-                setKind(k);
-                setAmount(priceFor(k, type));
+                setKind(e.target.value);
+                setPriceItemId(0);
+                setTariffName("");
               }}
             >
               <option value="trial">Пробное</option>
@@ -41,12 +81,11 @@ export function SingleVisitForm({ clientId }: { clientId: number }) {
           </Field>
           <Field label="Формат">
             <Select
-              name="type"
               value={type}
               onChange={(e) => {
-                const t = e.target.value;
-                setType(t);
-                setAmount(priceFor(kind, t));
+                setType(e.target.value);
+                setPriceItemId(0);
+                setTariffName("");
               }}
             >
               <option value="offline">Офлайн</option>

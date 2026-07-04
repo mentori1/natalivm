@@ -4,32 +4,71 @@ import { useState } from "react";
 import { createSubscription } from "@/lib/actions";
 import { Field, Input, Select, SubmitButton } from "@/components/form";
 import { Card } from "@/components/ui";
-
-// Цена за занятие по умолчанию в зависимости от типа
-const DEFAULT_PRICE: Record<string, number> = { offline: 1500, online: 1200 };
+import type { PriceOption } from "@/lib/prices";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function SubscriptionForm({ clientId }: { clientId: number }) {
-  const [type, setType] = useState("offline");
-  const [price, setPrice] = useState(DEFAULT_PRICE.offline);
+export function SubscriptionForm({
+  clientId,
+  prices,
+}: {
+  clientId: number;
+  prices: PriceOption[];
+}) {
+  const options = prices.filter((p) => p.kind === "subscription" && p.active);
+  const initial = options[0] ?? null;
+  const [priceItemId, setPriceItemId] = useState(initial?.id ?? 0);
+  const [type, setType] = useState(initial?.type ?? "offline");
+  const [tariffName, setTariffName] = useState(initial?.name ?? "");
+  const [price, setPrice] = useState(initial?.price ?? 1500);
+  const [lessons, setLessons] = useState(initial?.minLessons ?? 4);
+
+  function selectTariff(id: number) {
+    const selected = options.find((p) => p.id === id);
+    setPriceItemId(id);
+    if (!id) {
+      setTariffName("");
+      return;
+    }
+    if (!selected) return;
+    setType(selected.type);
+    setTariffName(selected.name);
+    setPrice(selected.price);
+    setLessons((current) => Math.max(current, selected.minLessons ?? 4));
+  }
 
   return (
     <Card className="space-y-4 p-4">
       <form action={createSubscription} className="space-y-4">
         <input type="hidden" name="clientId" value={clientId} />
+        <input type="hidden" name="type" value={type} />
+        <input type="hidden" name="tariffName" value={tariffName} />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Тип">
+          <Field label="Тариф">
             <Select
-              name="type"
+              name="priceItemId"
+              value={priceItemId}
+              onChange={(e) => selectTariff(Number(e.target.value))}
+            >
+              <option value={0}>Вручную</option>
+              {options.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.type === "online" ? "Онлайн" : "Офлайн"} · {p.name} ·{" "}
+                  {p.price.toLocaleString("ru-RU")} ₽
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Формат">
+            <Select
               value={type}
               onChange={(e) => {
-                const t = e.target.value;
-                setType(t);
-                setPrice(DEFAULT_PRICE[t] ?? price);
+                setType(e.target.value);
+                setPriceItemId(0);
+                setTariffName("");
               }}
             >
               <option value="offline">Офлайн</option>
@@ -42,7 +81,8 @@ export function SubscriptionForm({ clientId }: { clientId: number }) {
               type="number"
               min={4}
               step={1}
-              defaultValue={4}
+              value={lessons}
+              onChange={(e) => setLessons(Number(e.target.value))}
               required
             />
           </Field>

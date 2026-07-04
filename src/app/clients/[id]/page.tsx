@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { clientStats } from "@/lib/queries";
+import { getActivePriceItems } from "@/lib/prices";
 import {
   addGoal,
   addNote,
@@ -61,6 +62,7 @@ export default async function ClientCardPage({
     },
   });
   if (!client) notFound();
+  const priceItems = await getActivePriceItems();
 
   const meta = CLIENT_STATUS[effectiveClientStatus(client.status, client.subscriptions)];
   const { visits, spent } = clientStats(client.subscriptions);
@@ -159,7 +161,7 @@ export default async function ClientCardPage({
         <SectionTitle
           action={
             <Disclosure label="Абонемент">
-              <SubscriptionForm clientId={client.id} />
+              <SubscriptionForm clientId={client.id} prices={priceItems} />
             </Disclosure>
           }
         >
@@ -188,6 +190,7 @@ export default async function ClientCardPage({
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-ink">
                           {SUB_TYPE[s.type as SubType].label}
+                          {s.tariffName ? ` · ${s.tariffName}` : ""}
                         </span>
                         <Badge tone={SUB_STATUS[st as SubStatus].tone}>
                           {SUB_STATUS[st as SubStatus].label}
@@ -225,7 +228,7 @@ export default async function ClientCardPage({
         <SectionTitle
           action={
             <Disclosure label="Визит">
-              <SingleVisitForm clientId={client.id} />
+              <SingleVisitForm clientId={client.id} prices={priceItems} />
             </Disclosure>
           }
         >
@@ -243,6 +246,7 @@ export default async function ClientCardPage({
                   <p className="font-semibold text-ink">
                     {SINGLE_VISIT_KIND[v.kind]?.label ?? v.kind} ·{" "}
                     {SUB_TYPE[v.type as SubType].short}
+                    {v.tariffName ? ` · ${v.tariffName}` : ""}
                   </p>
                   <p className="text-sm text-muted">
                     {formatDate(v.date)} · {formatMoney(v.amount)}

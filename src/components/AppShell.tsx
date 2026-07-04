@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { logout } from "@/lib/auth-actions";
-import { IconHome, IconUsers, IconCalendar, IconWallet } from "./icons";
+import { IconHome, IconUsers, IconCalendar, IconWallet, IconTag } from "./icons";
 
 const IconLogout = ({ className }: { className?: string }) => (
   <svg
@@ -28,6 +28,7 @@ const NAV = [
   { href: "/", label: "Главная", Icon: IconHome, exact: true },
   { href: "/clients", label: "Клиенты", Icon: IconUsers },
   { href: "/lessons", label: "Занятия", Icon: IconCalendar },
+  { href: "/prices", label: "Прайс", Icon: IconTag },
   { href: "/finance", label: "Финансы", Icon: IconWallet },
 ];
 

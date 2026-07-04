@@ -107,6 +107,7 @@ export default async function SubscriptionPage({
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-ink">
               {SUB_TYPE[sub.type as SubType].label}
+              {sub.tariffName ? ` · ${sub.tariffName}` : ""}
             </span>
             <Badge tone={SUB_STATUS[st as SubStatus].tone}>
               {SUB_STATUS[st as SubStatus].label}
