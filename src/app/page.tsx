@@ -33,10 +33,11 @@ const ruDate = new Intl.DateTimeFormat("ru-RU", {
 });
 
 export default async function DashboardPage() {
-  const { reminders, todayLessons, finance } = await getDashboard();
+  const { reminders, todayLessons, finance, weather } = await getDashboard();
   const today = ruDate.format(new Date());
   const visibleReminders = reminders.slice(0, 5);
   const hiddenReminders = reminders.slice(5);
+  const offlineToday = todayLessons.filter((l) => l.type === "offline").length;
 
   return (
     <div className="space-y-8">
@@ -46,6 +47,8 @@ export default async function DashboardPage() {
         revenueMonth={finance.revenueMonth}
         todayLessons={todayLessons.length}
         attention={reminders.length}
+        offlineToday={offlineToday}
+        weather={weather}
       />
 
       {/* Требуют внимания */}
@@ -164,12 +167,21 @@ function StudioPulse({
   revenueMonth,
   todayLessons,
   attention,
+  offlineToday,
+  weather,
 }: {
   today: string;
   activeClients: number;
   revenueMonth: number;
   todayLessons: number;
   attention: number;
+  offlineToday: number;
+  weather: {
+    temp: number;
+    feelsLike: number;
+    wind: number;
+    message: string;
+  } | null;
 }) {
   return (
     <section className="studio-pulse overflow-hidden rounded-[1.75rem] border border-line bg-surface p-5 shadow-sm sm:p-6">
@@ -184,6 +196,7 @@ function StudioPulse({
           <p className="mt-3 max-w-lg text-sm leading-6 text-muted">
             На сегодня видно клиентов, занятия, продления и деньги месяца.
           </p>
+          <WeatherLine weather={weather} offlineToday={offlineToday} />
         </div>
 
         <div className="studio-signal mx-auto flex size-44 items-center justify-center sm:size-52">
@@ -203,6 +216,40 @@ function StudioPulse({
         <PulseMetric label="Выручка" value={formatMoney(revenueMonth)} />
       </div>
     </section>
+  );
+}
+
+function WeatherLine({
+  weather,
+  offlineToday,
+}: {
+  weather: {
+    temp: number;
+    feelsLike: number;
+    wind: number;
+    message: string;
+  } | null;
+  offlineToday: number;
+}) {
+  if (!weather) {
+    return (
+      <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm text-muted shadow-sm backdrop-blur">
+        Хорошего дня и спокойных занятий.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur">
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-dark">
+        Москва · {weather.temp}° · ветер {weather.wind} км/ч
+      </p>
+      <p className="mt-1 text-sm leading-5 text-ink">
+        {offlineToday > 0
+          ? weather.message
+          : `В Москве ${weather.temp}°, ощущается как ${weather.feelsLike}°. Сегодня без офлайн-занятий, хорошего настроения.`}
+      </p>
+    </div>
   );
 }
 

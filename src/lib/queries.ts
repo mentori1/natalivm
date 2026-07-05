@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getMoscowWeather } from "@/lib/weather";
 import {
   buildReminders,
   derivedSubStatus,
@@ -121,6 +122,7 @@ export async function getDashboard() {
       free: l.capacity ? Math.max(0, l.capacity - enrolled) : null,
     };
   });
+  const weather = await getMoscowWeather();
 
   const mStart = startOfMonth(now);
   const mEnd = endOfMonth(now);
@@ -172,6 +174,7 @@ export async function getDashboard() {
   return {
     reminders,
     todayLessons,
+    weather,
     finance: {
       revenueMonth,
       expensesMonth,
