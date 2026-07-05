@@ -131,11 +131,10 @@ function Brand() {
   return (
     <Link href="/" className="flex items-center gap-3 px-1.5">
       <span className="flex size-10 items-center justify-center rounded-2xl bg-brand text-lg font-bold text-white">
-        Н
+        V
       </span>
       <span className="leading-tight">
-        <span className="block font-bold text-ink">Наташа</span>
-        <span className="block text-xs text-muted">студия танца</span>
+        <span className="block font-bold text-ink">VUMEXCLUSIVE</span>
       </span>
     </Link>
   );

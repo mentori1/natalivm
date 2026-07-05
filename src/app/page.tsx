@@ -40,20 +40,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="text-sm text-muted capitalize">{today}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          Здравствуйте, Наташа
-        </h1>
-      </header>
-
-      {/* Быстрые показатели */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Активных" value={String(finance.activeClients)} />
-        <StatTile label="Выручка, мес" value={formatMoney(finance.revenueMonth)} />
-        <StatTile label="Занятий сегодня" value={String(todayLessons.length)} />
-        <StatTile label="К продлению" value={String(finance.expectedRenewals)} />
-      </div>
+      <StudioPulse
+        today={today}
+        activeClients={finance.activeClients}
+        revenueMonth={finance.revenueMonth}
+        todayLessons={todayLessons.length}
+        attention={reminders.length}
+      />
 
       {/* Требуют внимания */}
       <section>
@@ -165,6 +158,63 @@ export default async function DashboardPage() {
   );
 }
 
+function StudioPulse({
+  today,
+  activeClients,
+  revenueMonth,
+  todayLessons,
+  attention,
+}: {
+  today: string;
+  activeClients: number;
+  revenueMonth: number;
+  todayLessons: number;
+  attention: number;
+}) {
+  return (
+    <section className="studio-pulse overflow-hidden rounded-[1.75rem] border border-line bg-surface p-5 shadow-sm sm:p-6">
+      <div className="relative z-10 grid gap-5 md:grid-cols-[1.15fr_0.85fr] md:items-center">
+        <div>
+          <p className="studio-pulse-kicker text-sm font-medium text-brand-dark capitalize">
+            {today}
+          </p>
+          <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl">
+            Наталья, студия под контролем
+          </h1>
+          <p className="mt-3 max-w-lg text-sm leading-6 text-muted">
+            На сегодня видно клиентов, занятия, продления и деньги месяца.
+          </p>
+        </div>
+
+        <div className="studio-signal mx-auto flex size-44 items-center justify-center sm:size-52">
+          <div className="studio-signal-core flex size-24 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm sm:size-28">
+            <IconSparkle className="size-6 text-brand" />
+            <span className="mt-1 text-xs font-semibold text-brand-dark">
+              Пульс
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <PulseMetric label="Активных" value={String(activeClients)} />
+        <PulseMetric label="Сегодня" value={String(todayLessons)} />
+        <PulseMetric label="Внимания" value={String(attention)} />
+        <PulseMetric label="Выручка" value={formatMoney(revenueMonth)} />
+      </div>
+    </section>
+  );
+}
+
+function PulseMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="studio-pulse-metric rounded-2xl border border-white/70 bg-white/78 px-4 py-3 shadow-sm backdrop-blur">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="mt-1 text-xl font-bold tracking-tight text-ink">{value}</p>
+    </div>
+  );
+}
+
 function ReminderRow({
   reminder,
 }: {
@@ -189,15 +239,6 @@ function ReminderRow({
       <Badge tone={meta.tone}>{meta.label}</Badge>
       <IconChevronRight className="size-5 shrink-0 text-muted/50" />
     </Link>
-  );
-}
-
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="px-4 py-3.5">
-      <p className="text-xs font-medium text-muted">{label}</p>
-      <p className="mt-1 text-xl font-bold tracking-tight text-ink">{value}</p>
-    </Card>
   );
 }
 

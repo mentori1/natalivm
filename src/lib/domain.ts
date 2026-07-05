@@ -197,6 +197,7 @@ export type ClientFormValues = {
   phone: string;
   telegram: string;
   instagram: string;
+  firstContact: string;
   birthDate: string;
   request: string;
   recommendations: string;

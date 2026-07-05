@@ -57,3 +57,139 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+.studio-pulse {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(253, 246, 248, 0.92)),
+    linear-gradient(120deg, rgba(177, 74, 107, 0.12), rgba(143, 58, 86, 0.04));
+  animation: studio-enter 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.studio-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(177, 74, 107, 0.1), transparent),
+    repeating-linear-gradient(
+      115deg,
+      rgba(177, 74, 107, 0.08) 0 1px,
+      transparent 1px 26px
+    );
+  mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+  opacity: 0.55;
+}
+
+.studio-pulse-kicker,
+.studio-pulse h1,
+.studio-pulse p {
+  animation: studio-rise 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.studio-pulse h1 {
+  animation-delay: 90ms;
+}
+
+.studio-pulse p:not(.studio-pulse-kicker) {
+  animation-delay: 160ms;
+}
+
+.studio-signal {
+  position: relative;
+}
+
+.studio-signal::before,
+.studio-signal::after {
+  content: "";
+  position: absolute;
+  inset: 16%;
+  border: 1px solid rgba(177, 74, 107, 0.2);
+  border-radius: 999px;
+  animation: studio-ring 2.6s ease-out infinite;
+}
+
+.studio-signal::after {
+  inset: 4%;
+  animation-delay: 800ms;
+}
+
+.studio-signal-core {
+  position: relative;
+  z-index: 1;
+  animation: studio-float 3.8s ease-in-out infinite;
+}
+
+.studio-pulse-metric {
+  animation: studio-rise 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.studio-pulse-metric:nth-child(1) {
+  animation-delay: 180ms;
+}
+
+.studio-pulse-metric:nth-child(2) {
+  animation-delay: 250ms;
+}
+
+.studio-pulse-metric:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+.studio-pulse-metric:nth-child(4) {
+  animation-delay: 390ms;
+}
+
+@keyframes studio-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes studio-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes studio-ring {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.78);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes studio-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-pulse,
+  .studio-pulse *,
+  .studio-signal::before,
+  .studio-signal::after {
+    animation: none !important;
+  }
+}

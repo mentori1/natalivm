@@ -19,6 +19,7 @@ type ClientData = {
   source: string | null;
   sourceDetail: string | null;
   status: string;
+  firstContact: Date;
   request: string | null;
   recommendations: string | null;
   birthDate: Date | null;
@@ -31,6 +32,10 @@ const STATUS_OPTIONS = Object.entries(CLIENT_STATUS) as [
 
 function dateValue(d: Date | null): string {
   return d ? d.toISOString().slice(0, 10) : "";
+}
+
+function todayValue(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function ClientForm({
@@ -126,6 +131,19 @@ export function ClientForm({
               name="birthDate"
               type="date"
               defaultValue={v?.birthDate ?? dateValue(client?.birthDate ?? null)}
+            />
+          </Field>
+          <Field
+            label="Первый контакт"
+            hint="Можно поставить старую дату, если переносите клиентку из прежней базы."
+          >
+            <Input
+              name="firstContact"
+              type="date"
+              defaultValue={
+                v?.firstContact ??
+                (client ? dateValue(client.firstContact) : todayValue())
+              }
             />
           </Field>
         </div>

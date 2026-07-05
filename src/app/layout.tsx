@@ -10,7 +10,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Наташа · кабинет преподавателя",
+  title: "VUMEXCLUSIVE · CRM",
   description: "Мини-CRM преподавателя танцев: клиенты, абонементы, занятия",
 };
 
