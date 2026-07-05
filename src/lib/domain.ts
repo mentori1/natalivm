@@ -254,23 +254,23 @@ export function effectiveClientStatus(
   subs: SubLike[],
   now = new Date(),
 ): ClientStatus {
-  if (
-    storedStatus === "lead" ||
-    storedStatus === "trial" ||
-    storedStatus === "barter" ||
-    storedStatus === "inactive"
-  ) {
+  if (storedStatus === "barter" || storedStatus === "inactive") {
     return storedStatus;
   }
+
   // есть рабочий или замороженный абонемент → активный
   const hasLive = subs.some((s) => {
     const st = derivedSubStatus(s, now);
     return st === "active" || st === "ending" || st === "frozen";
   });
   if (hasLive) return "active";
+
   // были абонементы, но все закончились → «абонемент закончился»
   if (subs.length > 0) return "expired";
-  return storedStatus as ClientStatus;
+
+  // Если абонементов нет, клиент не должен случайно оставаться «активным».
+  if (storedStatus === "active" || storedStatus === "expired") return "lead";
+  return storedStatus === "trial" ? "trial" : "lead";
 }
 
 // ───────────────────────── напоминания (дашборд) ─────────────────────────

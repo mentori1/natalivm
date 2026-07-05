@@ -14,16 +14,6 @@ import { IconChevronRight, IconPlus, IconUsers } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: { key: "all" | ClientStatus; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "active", label: "Активные" },
-  { key: "trial", label: "Пробные" },
-  { key: "expired", label: "Закончились" },
-  { key: "lead", label: "Лиды" },
-  { key: "barter", label: "Бартер" },
-  { key: "inactive", label: "Неактивные" },
-];
-
 const SUMMARY: { key: "all" | ClientStatus; label: string; hint: string }[] = [
   { key: "all", label: "Всего", hint: "в базе" },
   { key: "lead", label: "Лиды", hint: "ещё не были" },
@@ -132,33 +122,6 @@ export default async function ClientsPage({
               <p className={`mt-1 text-xs ${active ? "text-white/75" : "text-muted"}`}>
                 {item.hint}
               </p>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Фильтр по статусу */}
-      <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-        {FILTERS.map((f) => {
-          const active = f.key === status;
-          return (
-            <Link
-              key={f.key}
-              href={f.key === "all" ? "/clients" : `/clients?status=${f.key}`}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-brand text-white"
-                  : "bg-white text-ink/70 ring-1 ring-line hover:bg-brand-tint"
-              }`}
-            >
-              {f.label}
-              <span
-                className={`ml-1 rounded-full px-1.5 text-xs ${
-                  active ? "bg-white/20 text-white" : "bg-black/5 text-muted"
-                }`}
-              >
-                {counts[f.key]}
-              </span>
             </Link>
           );
         })}

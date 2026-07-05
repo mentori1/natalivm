@@ -56,16 +56,7 @@ export default async function ClientCardPage({
     where: { id: clientId },
     include: {
       subscriptions: {
-        include: { visits: true },
         orderBy: { createdAt: "desc" },
-      },
-      attendances: {
-        where: { status: "present" },
-        include: {
-          lesson: true,
-          subscription: true,
-        },
-        orderBy: { lesson: { startsAt: "desc" } },
       },
       singleVisits: { orderBy: { date: "desc" } },
       notes: { orderBy: { createdAt: "desc" } },
@@ -81,38 +72,6 @@ export default async function ClientCardPage({
   const trainerSpent = client.hasTrainer
     ? (client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)
     : 0;
-  const manualVisits = client.subscriptions.flatMap((s) =>
-    s.visits.map((v) => ({
-      key: `m${v.id}`,
-      date: v.date,
-      title: "Отмечено в календаре",
-      kind: "Абонемент",
-      type: s.type,
-      detail: s.tariffName ?? SUB_TYPE[s.type as SubType].label,
-    })),
-  );
-  const lessonVisits = client.attendances.map((a) => ({
-    key: `a${a.id}`,
-    date: a.lesson.startsAt,
-    title: a.lesson.title ?? "Занятие",
-    kind: "Расписание",
-    type: a.lesson.type,
-    detail:
-      a.subscription?.tariffName ??
-      (a.subscription
-        ? SUB_TYPE[a.subscription.type as SubType].label
-        : SUB_TYPE[a.lesson.type as SubType].label),
-  }));
-  const singleHistory = client.singleVisits.map((v) => ({
-    key: `v${v.id}`,
-    date: v.date,
-    title: SINGLE_VISIT_KIND[v.kind]?.label ?? v.kind,
-    kind: "Визит",
-    type: v.type,
-    detail: `${v.tariffName ?? SUB_TYPE[v.type as SubType].label} · ${formatMoney(v.amount)}`,
-  }));
-  const visitHistory = [...lessonVisits, ...manualVisits, ...singleHistory]
-    .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
     <div className="space-y-7">
@@ -306,31 +265,6 @@ export default async function ClientCardPage({
                     <IconX className="size-4" />
                   </button>
                 </form>
-              </div>
-            ))}
-          </Card>
-        )}
-      </section>
-
-      {/* История занятий */}
-      <section>
-        <SectionTitle>История занятий</SectionTitle>
-        {visitHistory.length === 0 ? (
-          <Card className="p-5 text-sm text-muted">
-            Посещений пока нет.
-          </Card>
-        ) : (
-          <Card className="divide-y divide-line overflow-hidden p-0">
-            {visitHistory.map((v) => (
-              <div key={v.key} className="flex items-start gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-ink">{v.title}</p>
-                  <p className="text-sm text-muted">
-                    {formatDate(v.date)} · {SUB_TYPE[v.type as SubType].short} ·{" "}
-                    {v.detail}
-                  </p>
-                </div>
-                <Badge tone="slate">{v.kind}</Badge>
               </div>
             ))}
           </Card>
