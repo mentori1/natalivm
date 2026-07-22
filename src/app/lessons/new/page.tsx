@@ -3,13 +3,14 @@ import { createLesson } from "@/lib/actions";
 import { Field, Input, Select, SubmitButton } from "@/components/form";
 import { Card } from "@/components/ui";
 import { IconArrowLeft } from "@/components/icons";
+import { currentMoscowWallClockDate } from "@/lib/domain";
 
 function defaultStart(): string {
   // сегодня 19:00 в формате для datetime-local
-  const d = new Date();
-  d.setHours(19, 0, 0, 0);
+  const d = currentMoscowWallClockDate();
+  d.setUTCHours(19, 0, 0, 0);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 export default function NewLessonPage() {
@@ -31,13 +32,19 @@ export default function NewLessonPage() {
             <Input name="title" placeholder="Оффлайн группа" />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Формат">
+              <Select name="format" defaultValue="group">
+                <option value="group">Групповое</option>
+                <option value="individual">Индивидуальное</option>
+              </Select>
+            </Field>
             <Field label="Тип">
               <Select name="type" defaultValue="offline">
                 <option value="offline">Офлайн</option>
                 <option value="online">Онлайн</option>
               </Select>
             </Field>
-            <Field label="Мест" hint="Необязательно">
+            <Field label="Мест" hint="Для индивидуального по умолчанию 1">
               <Input name="capacity" type="number" min={1} placeholder="8" />
             </Field>
             <Field label="Дата и время">

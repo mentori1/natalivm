@@ -6,10 +6,17 @@ import {
   enrollClient,
   unenrollClient,
   deleteLesson,
+  updateLessonSettings,
 } from "@/lib/actions";
-import { SUB_TYPE, formatDateTime, type SubType } from "@/lib/domain";
+import {
+  LESSON_FORMAT,
+  SUB_TYPE,
+  formatDateTime,
+  type LessonFormat,
+  type SubType,
+} from "@/lib/domain";
 import { Avatar, Badge, Card, SectionTitle, buttonClass } from "@/components/ui";
-import { Select, SubmitButton } from "@/components/form";
+import { Input, Select, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { IconArrowLeft, IconCheck, IconX } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -61,12 +68,15 @@ export default async function LessonPage({
       <Card className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
                 {lesson.title ?? "Занятие"}
               </h1>
               <Badge tone={lesson.type === "online" ? "blue" : "violet"}>
                 {SUB_TYPE[lesson.type as SubType].short}
+              </Badge>
+              <Badge tone={LESSON_FORMAT[lesson.format as LessonFormat].tone}>
+                {LESSON_FORMAT[lesson.format as LessonFormat].short}
               </Badge>
             </div>
             <p className="mt-1 text-sm text-muted capitalize">
@@ -101,6 +111,43 @@ export default async function LessonPage({
             </div>
           ) : null}
         </div>
+
+        <form
+          action={updateLessonSettings}
+          className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-3"
+        >
+          <input type="hidden" name="id" value={lesson.id} />
+          <label className="min-w-0 text-sm font-medium text-ink">
+            Формат занятия
+            <Select name="format" defaultValue={lesson.format} className="mt-1">
+              <option value="group">Групповое</option>
+              <option value="individual">Индивидуальное</option>
+            </Select>
+          </label>
+          <label className="min-w-0 text-sm font-medium text-ink">
+            Онлайн / офлайн
+            <Select name="type" defaultValue={lesson.type} className="mt-1">
+              <option value="offline">Офлайн</option>
+              <option value="online">Онлайн</option>
+            </Select>
+          </label>
+          <label className="min-w-0 text-sm font-medium text-ink">
+            Количество мест
+            <Input
+              name="capacity"
+              type="number"
+              min={1}
+              defaultValue={lesson.capacity ?? ""}
+              placeholder={lesson.format === "individual" ? "1" : "Укажите для бота"}
+              className="mt-1"
+            />
+          </label>
+          <div className="sm:col-span-3 sm:flex sm:justify-end">
+            <SubmitButton variant="soft" size="md">
+              Сохранить настройки
+            </SubmitButton>
+          </div>
+        </form>
       </Card>
 
       {/* Список и отметка посещений */}

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getMoscowWeather } from "@/lib/weather";
 import {
   buildReminders,
+  currentMoscowWallClockDate,
   derivedSubStatus,
   isUsable,
   normalizeHandle,
@@ -71,6 +72,16 @@ export function endOfDay(d: Date): Date {
   x.setHours(23, 59, 59, 999);
   return x;
 }
+function startOfUtcDay(d: Date): Date {
+  const x = new Date(d);
+  x.setUTCHours(0, 0, 0, 0);
+  return x;
+}
+function endOfUtcDay(d: Date): Date {
+  const x = new Date(d);
+  x.setUTCHours(23, 59, 59, 999);
+  return x;
+}
 export function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
@@ -91,6 +102,7 @@ export function clientStats(subs: {
 
 export async function getDashboard() {
   const now = new Date();
+  const lessonNow = currentMoscowWallClockDate(now);
 
   const clients = await prisma.client.findMany({
     include: { subscriptions: true, singleVisits: true },
@@ -98,7 +110,9 @@ export async function getDashboard() {
   const reminders = buildReminders(clients as ClientForReminders[], now);
 
   const todayLessonsRaw = await prisma.lesson.findMany({
-    where: { startsAt: { gte: startOfDay(now), lte: endOfDay(now) } },
+    where: {
+      startsAt: { gte: startOfUtcDay(lessonNow), lte: endOfUtcDay(lessonNow) },
+    },
     include: { attendances: true },
     orderBy: { startsAt: "asc" },
   });
@@ -116,6 +130,7 @@ export async function getDashboard() {
       id: l.id,
       title: l.title,
       type: l.type,
+      format: l.format,
       startsAt: l.startsAt,
       capacity: l.capacity,
       enrolled,

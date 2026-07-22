@@ -34,6 +34,15 @@ function dateOrNull(fd: FormData, key: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// datetime-local не содержит часовой пояс. Храним введённое время как UTC-значение,
+// чтобы 19:30 оставалось 19:30 и на Vercel, и на локальном/собственном сервере.
+function wallClockDateTimeOrNull(fd: FormData, key: string): Date | null {
+  const v = str(fd, key);
+  if (!v) return null;
+  const d = new Date(`${v}Z`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function priceKind(fd: FormData): PriceKind {
   const v = str(fd, "kind");
   return v === "subscription" || v === "single" || v === "trial"
@@ -490,19 +499,38 @@ export async function deletePriceItem(fd: FormData) {
 
 // ─────────── Занятия ───────────
 export async function createLesson(fd: FormData) {
-  const startsAt = dateOrNull(fd, "startsAt");
+  const startsAt = wallClockDateTimeOrNull(fd, "startsAt");
   if (!startsAt) return;
+  const format = str(fd, "format") === "individual" ? "individual" : "group";
   const lesson = await prisma.lesson.create({
     data: {
       title: strOrNull(fd, "title"),
       type: str(fd, "type") === "online" ? "online" : "offline",
+      format,
       startsAt,
-      capacity: num(fd, "capacity", 0) || null,
+      capacity: num(fd, "capacity", 0) || (format === "individual" ? 1 : null),
     },
   });
   revalidatePath("/lessons");
   revalidatePath("/");
   redirect(`/lessons/${lesson.id}`);
+}
+
+export async function updateLessonSettings(fd: FormData) {
+  const id = num(fd, "id");
+  if (!id) return;
+  const format = str(fd, "format") === "individual" ? "individual" : "group";
+  await prisma.lesson.update({
+    where: { id },
+    data: {
+      format,
+      type: str(fd, "type") === "online" ? "online" : "offline",
+      capacity: num(fd, "capacity", 0) || (format === "individual" ? 1 : null),
+    },
+  });
+  revalidatePath(`/lessons/${id}`);
+  revalidatePath("/lessons");
+  revalidatePath("/");
 }
 
 export async function deleteLesson(fd: FormData) {

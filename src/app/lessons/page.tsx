@@ -1,18 +1,32 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { SUB_TYPE, formatDateTime, formatTime, type SubType } from "@/lib/domain";
+import {
+  LESSON_FORMAT,
+  SUB_TYPE,
+  currentMoscowWallClockDate,
+  formatDateTime,
+  type LessonFormat,
+  type SubType,
+} from "@/lib/domain";
 import { Badge, Card, EmptyState, SectionTitle, buttonClass } from "@/components/ui";
 import { IconChevronRight, IconPlus, IconCalendar } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-type LessonFilter = "all" | "online" | "offline";
+type LessonTypeFilter = "all" | "online" | "offline";
+type LessonFormatFilter = "all" | "group" | "individual";
 type LessonView = "list" | "calendar";
 
-const FILTERS: { key: LessonFilter; label: string }[] = [
+const TYPE_FILTERS: { key: LessonTypeFilter; label: string }[] = [
   { key: "all", label: "Все" },
   { key: "offline", label: "Офлайн" },
   { key: "online", label: "Онлайн" },
+];
+
+const FORMAT_FILTERS: { key: LessonFormatFilter; label: string }[] = [
+  { key: "all", label: "Все" },
+  { key: "group", label: "Групповые" },
+  { key: "individual", label: "Индивидуальные" },
 ];
 
 const VIEWS: { key: LessonView; label: string }[] = [
@@ -23,21 +37,34 @@ const VIEWS: { key: LessonView; label: string }[] = [
 export default async function LessonsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; view?: string; m?: string; d?: string }>;
+  searchParams: Promise<{
+    type?: string;
+    format?: string;
+    view?: string;
+    m?: string;
+    d?: string;
+  }>;
 }) {
   const params = await searchParams;
-  const type: LessonFilter =
+  const type: LessonTypeFilter =
     params.type === "online" || params.type === "offline" ? params.type : "all";
+  const format: LessonFormatFilter =
+    params.format === "group" || params.format === "individual"
+      ? params.format
+      : "all";
   const view: LessonView = params.view === "calendar" ? "calendar" : "list";
-  const now = new Date();
+  const now = currentMoscowWallClockDate();
   const selectedMonth = parseMonth(params.m) ?? new Date(now.getFullYear(), now.getMonth(), 1);
 
   const lessons = await prisma.lesson.findMany({
     include: { attendances: true },
     orderBy: { startsAt: "asc" },
   });
-  const filteredLessons =
-    type === "all" ? lessons : lessons.filter((l) => l.type === type);
+  const filteredLessons = lessons.filter(
+    (lesson) =>
+      (type === "all" || lesson.type === type) &&
+      (format === "all" || lesson.format === format),
+  );
 
   // «Предстоящие» — те, что ещё не начались; начавшиеся уходят в «Прошедшие»
   const upcoming = filteredLessons.filter((l) => l.startsAt >= now);
@@ -66,20 +93,48 @@ export default async function LessonsPage({
         </Link>
       </header>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Segmented
-          items={FILTERS.map((f) => ({
-            key: f.key,
-            label: f.label,
-            href: lessonsHref({ type: f.key, view, m: monthKey(selectedMonth), d: selectedKey }),
-          }))}
-          active={type}
-        />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-3">
+          <Segmented
+            items={FORMAT_FILTERS.map((f) => ({
+              key: f.key,
+              label: f.label,
+              href: lessonsHref({
+                type,
+                format: f.key,
+                view,
+                m: monthKey(selectedMonth),
+                d: selectedKey,
+              }),
+            }))}
+            active={format}
+          />
+          <Segmented
+            items={TYPE_FILTERS.map((f) => ({
+              key: f.key,
+              label: f.label,
+              href: lessonsHref({
+                type: f.key,
+                format,
+                view,
+                m: monthKey(selectedMonth),
+                d: selectedKey,
+              }),
+            }))}
+            active={type}
+          />
+        </div>
         <Segmented
           items={VIEWS.map((v) => ({
             key: v.key,
             label: v.label,
-            href: lessonsHref({ type, view: v.key, m: monthKey(selectedMonth), d: selectedKey }),
+            href: lessonsHref({
+              type,
+              format,
+              view: v.key,
+              m: monthKey(selectedMonth),
+              d: selectedKey,
+            }),
           }))}
           active={view}
         />
@@ -104,6 +159,7 @@ export default async function LessonsPage({
           selectedKey={selectedKey}
           selectedDayLessons={selectedDayLessons}
           type={type}
+          format={format}
         />
       )}
 
@@ -168,12 +224,14 @@ function CalendarView({
   selectedKey,
   selectedDayLessons,
   type,
+  format,
 }: {
   lessons: Lesson[];
   selectedMonth: Date;
   selectedKey: string;
   selectedDayLessons: Lesson[];
-  type: LessonFilter;
+  type: LessonTypeFilter;
+  format: LessonFormatFilter;
 }) {
   const days = calendarDays(selectedMonth);
   const lessonMap = new Map<string, Lesson[]>();
@@ -189,7 +247,7 @@ function CalendarView({
       <Card className="overflow-hidden p-0">
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <Link
-            href={lessonsHref({ type, view: "calendar", m: monthKey(prev) })}
+            href={lessonsHref({ type, format, view: "calendar", m: monthKey(prev) })}
             className="rounded-full px-3 py-1.5 text-sm font-semibold text-brand-dark hover:bg-brand-tint"
           >
             ‹
@@ -198,7 +256,7 @@ function CalendarView({
             {monthTitle(selectedMonth)}
           </h2>
           <Link
-            href={lessonsHref({ type, view: "calendar", m: monthKey(next) })}
+            href={lessonsHref({ type, format, view: "calendar", m: monthKey(next) })}
             className="rounded-full px-3 py-1.5 text-sm font-semibold text-brand-dark hover:bg-brand-tint"
           >
             ›
@@ -224,7 +282,13 @@ function CalendarView({
             return (
               <Link
                 key={key}
-                href={lessonsHref({ type, view: "calendar", m: monthKey(selectedMonth), d: key })}
+                href={lessonsHref({
+                  type,
+                  format,
+                  view: "calendar",
+                  m: monthKey(selectedMonth),
+                  d: key,
+                })}
                 className={`min-h-16 border-r border-b border-line p-2 transition-colors hover:bg-brand-tint ${
                   selected ? "bg-brand-tint ring-2 ring-inset ring-brand/30" : "bg-white"
                 } ${inMonth ? "" : "opacity-35"}`}
@@ -257,7 +321,7 @@ function CalendarView({
               <LessonRow
                 key={lesson.id}
                 lesson={lesson}
-                past={lesson.startsAt < new Date()}
+                past={lesson.startsAt < currentMoscowWallClockDate()}
               />
             ))}
           </div>
@@ -275,6 +339,7 @@ function LessonRow({
     id: number;
     title: string | null;
     type: string;
+    format: string;
     startsAt: Date;
     capacity: number | null;
     attendances: { status: string }[];
@@ -287,12 +352,15 @@ function LessonRow({
     <Link href={`/lessons/${lesson.id}`}>
       <Card className="flex items-center gap-4 p-4 transition-colors hover:bg-brand-tint">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-semibold text-ink">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="min-w-0 flex-1 basis-full truncate font-semibold text-ink sm:basis-auto">
               {lesson.title ?? "Занятие"}
             </p>
             <Badge tone={lesson.type === "online" ? "blue" : "violet"}>
               {SUB_TYPE[lesson.type as SubType].short}
+            </Badge>
+            <Badge tone={LESSON_FORMAT[lesson.format as LessonFormat].tone}>
+              {LESSON_FORMAT[lesson.format as LessonFormat].short}
             </Badge>
           </div>
           <p className="mt-0.5 text-sm text-muted capitalize">
@@ -316,6 +384,7 @@ type Lesson = {
   id: number;
   title: string | null;
   type: string;
+  format: string;
   startsAt: Date;
   capacity: number | null;
   attendances: { status: string }[];
@@ -323,17 +392,20 @@ type Lesson = {
 
 function lessonsHref({
   type,
+  format,
   view,
   m,
   d,
 }: {
-  type?: LessonFilter;
+  type?: LessonTypeFilter;
+  format?: LessonFormatFilter;
   view?: LessonView;
   m?: string;
   d?: string;
 }) {
   const params = new URLSearchParams();
   if (type && type !== "all") params.set("type", type);
+  if (format && format !== "all") params.set("format", format);
   if (view && view !== "list") params.set("view", view);
   if (m) params.set("m", m);
   if (d) params.set("d", d);

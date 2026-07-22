@@ -3,6 +3,7 @@ import { getDashboard } from "@/lib/queries";
 import {
   formatMoney,
   formatTime,
+  LESSON_FORMAT,
   SUB_TYPE,
   type ReminderKind,
   type Tone,
@@ -107,6 +108,7 @@ export default async function DashboardPage() {
                       {l.title ?? "Занятие"}
                     </p>
                     <p className="text-sm text-muted">
+                      {LESSON_FORMAT[l.format as "group" | "individual"]?.label} ·{" "}
                       {SUB_TYPE[l.type as "online" | "offline"]?.label} · записано{" "}
                       {l.enrolled}
                       {l.free !== null && ` · свободно ${l.free}`}

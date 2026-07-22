@@ -217,6 +217,7 @@ async function main() {
     data: {
       title: "Оффлайн группа",
       type: "offline",
+      format: "group",
       startsAt: todayAt(19),
       capacity: 8,
     },
@@ -234,6 +235,7 @@ async function main() {
     data: {
       title: "Онлайн группа",
       type: "online",
+      format: "group",
       startsAt: tomorrow11,
       capacity: 12,
       attendances: { create: [{ clientId: irina.id, status: "enrolled" }] },

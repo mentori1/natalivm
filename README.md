@@ -54,6 +54,9 @@
 | `DATABASE_URL` | подключение к Postgres | Supabase → **Connect → Session pooler** (порт 5432) |
 | `APP_PASSWORD` | пароль входа преподавателя | задаёте сами |
 | `AUTH_SECRET` | подпись сессии | `openssl rand -hex 32` |
+| `TELEGRAM_BOT_TOKEN` | доступ к Telegram Business-боту | BotFather, хранить только в env |
+| `TELEGRAM_ADMIN_IDS` | кому разрешены команды и служебные уведомления | бот показывает ID после `/start` |
+| `TELEGRAM_WEBHOOK_SECRET` | защита production webhook | `openssl rand -hex 32` |
 
 Локально лежат в `.env` (`DATABASE_URL`) и `.env.local` (`APP_PASSWORD`, `AUTH_SECRET`).
 Эти файлы **не в git** (секреты). Шаблон со значениями-заглушками — [`.env.example`](.env.example).
@@ -91,6 +94,10 @@ npm run dev        # http://localhost:3000
 Согласованный алгоритм бота для записи и дожима лидов в личных чатах Натальи:
 [**БОТ-АЛГОРИТМ.md**](БОТ-АЛГОРИТМ.md).
 
+Локальный пилот запускается командой `npm run bot:dev`. Токен и ID администраторов лежат в
+`.env.bot.local`; файл игнорируется Git. Без команды владельца `/запись`, `/онлайн` или `/офлайн`
+бот не отвечает в личном чате.
+
 ## Команды
 
 | Команда | Что делает |
@@ -100,6 +107,7 @@ npm run dev        # http://localhost:3000
 | `npm run start` | запуск собранной версии |
 | `npm run db:push` | применить изменения схемы к базе |
 | `npm run db:studio` | визуальный редактор базы (Prisma Studio) |
+| `npm run bot:dev` | локальный тест Telegram Business-бота |
 
 > ⚠️ **`npm run db:seed` и `npm run db:reset` НЕ запускать на проде** — они затирают базу
 > тестовыми данными. Сейчас в базе реальные клиенты Наташи.

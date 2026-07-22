@@ -10,6 +10,7 @@ export type ClientStatus =
   | "barter";
 
 export type SubType = "online" | "offline";
+export type LessonFormat = "group" | "individual";
 
 export type SubStatus =
   | "active"
@@ -42,6 +43,40 @@ export const SUB_TYPE: Record<SubType, { label: string; short: string }> = {
   online: { label: "Онлайн", short: "Онлайн" },
   offline: { label: "Офлайн", short: "Офлайн" },
 };
+
+export const LESSON_FORMAT: Record<
+  LessonFormat,
+  { label: string; short: string; tone: Tone }
+> = {
+  group: { label: "Групповое", short: "Группа", tone: "green" },
+  individual: { label: "Индивидуальное", short: "Индивидуально", tone: "amber" },
+};
+
+/** Текущее московское время, закодированное как UTC wall-clock для расписания. */
+export function currentMoscowWallClockDate(now = new Date()): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return new Date(
+    Date.UTC(
+      value("year"),
+      value("month") - 1,
+      value("day"),
+      value("hour"),
+      value("minute"),
+      value("second"),
+    ),
+  );
+}
 
 export type Tone = "green" | "amber" | "red" | "slate" | "violet" | "blue";
 
@@ -476,6 +511,7 @@ export function formatMoney(n: number): string {
 const dateFmt = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
   month: "long",
+  timeZone: "UTC",
 });
 export function formatDate(d: Date | null): string {
   return d ? dateFmt.format(d) : "—";
@@ -484,6 +520,7 @@ export function formatDate(d: Date | null): string {
 const timeFmt = new Intl.DateTimeFormat("ru-RU", {
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "UTC",
 });
 export function formatTime(d: Date): string {
   return timeFmt.format(d);
@@ -494,6 +531,7 @@ const dateTimeFmt = new Intl.DateTimeFormat("ru-RU", {
   month: "long",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "UTC",
 });
 export function formatDateTime(d: Date): string {
   return dateTimeFmt.format(d);

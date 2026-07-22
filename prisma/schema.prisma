@@ -18,6 +18,7 @@ model Client {
   fullName        String
   phone           String?
   telegram        String?
+  telegramUserId  String?   @unique // стабильный Telegram ID для business-бота
   instagram       String?
   birthDate       DateTime?
   firstContact    DateTime  @default(now()) // дата первого контакта
@@ -40,6 +41,7 @@ model Client {
   notes         Note[]
   goals         ClientGoal[]
   singleVisits  SingleVisit[]
+  telegramConversations TelegramConversation[]
 }
 
 /// Разовое или пробное посещение (без абонемента, оплата за визит)
@@ -119,6 +121,7 @@ model Lesson {
   id        Int      @id @default(autoincrement())
   title     String? // напр. «Оффлайн группа»
   type      String // online | offline
+  format    String   @default("group") // group | individual
   startsAt  DateTime // дата и время начала
   capacity  Int? // сколько мест
   createdAt DateTime @default(now())
@@ -178,4 +181,67 @@ model Expense {
   date      DateTime @default(now())
   category  String? // аренда, реклама, прочее
   createdAt DateTime @default(now())
+}
+
+/// Подключение бота к личному аккаунту через Telegram Business.
+model TelegramBusinessConnection {
+  id              String   @id // business_connection_id от Telegram
+  ownerTelegramId String
+  ownerUsername   String?
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  conversations TelegramConversation[]
+}
+
+/// Состояние сценария записи в одном личном Telegram-чате.
+model TelegramConversation {
+  id                   Int      @id @default(autoincrement())
+  businessConnectionId String
+  businessConnection   TelegramBusinessConnection @relation(fields: [businessConnectionId], references: [id], onDelete: Cascade)
+  telegramChatId       String
+  telegramUserId       String?
+  username             String?
+  displayName          String?
+  clientId             Int?
+  client               Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  state                String   @default("idle") // idle | awaiting_type | options_sent | booked | human_takeover | manual_followup | closed
+  preferredType        String? // online | offline
+  lastIncomingAt       DateTime?
+  lastOwnerCommandAt   DateTime?
+  lastBotMessageAt     DateTime?
+  reminderSentAt       DateTime?
+  followupDueAt        DateTime?
+  stopped              Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tasks BotTask[]
+
+  @@unique([businessConnectionId, telegramChatId])
+  @@index([clientId])
+  @@index([followupDueAt, state])
+}
+
+/// Служебная задача Наталье/администратору, например ручной дожим через 48 часов.
+model BotTask {
+  id                 Int      @id @default(autoincrement())
+  conversationId     Int
+  conversation       TelegramConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  type               String   @default("manual_followup")
+  status             String   @default("pending") // pending | notified | done | cancelled
+  dueAt              DateTime
+  notificationSentAt DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([status, dueAt])
+}
+
+/// Обработанные Telegram updates — защита от повторной обработки.
+model TelegramUpdate {
+  id          String   @id
+  processedAt DateTime @default(now())
 }
