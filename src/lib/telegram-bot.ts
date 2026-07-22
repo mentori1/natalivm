@@ -276,9 +276,15 @@ async function sendSchedule(
     return;
   }
 
+  const scarcityText = (free: number) => {
+    if (free > 3) return "";
+    const places = free === 1 ? "свободное место" : "свободных места";
+    return ` — осталось всего ${free} ${places}`;
+  };
+
   const lines = available.map(
     ({ lesson, free }, index) =>
-      `${index + 1}. ${formatDateTime(lesson.startsAt)} — свободно ${free}`,
+      `${index + 1}. ${formatDateTime(lesson.startsAt)}${scarcityText(free)}`,
   );
   await sendBusinessMessage(
     connectionId,
@@ -287,7 +293,7 @@ async function sendSchedule(
     {
       inline_keyboard: available.map(({ lesson, free }) => [
         {
-          text: `${formatDateTime(lesson.startsAt)} · ${free} мест`,
+          text: `${formatDateTime(lesson.startsAt)}${free <= 3 ? ` · осталось ${free}` : ""}`,
           callback_data: `book:${lesson.id}`,
         },
       ]),
