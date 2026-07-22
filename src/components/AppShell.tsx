@@ -94,8 +94,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Нижние табы — мобайл */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <nav
+        aria-label="Основная навигация"
+        data-testid="mobile-nav"
+        className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] isolate border-t border-line bg-surface [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
+      >
+        <div className="relative z-10 mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {NAV.map(({ href, label, Icon, exact }) => {
             const active = isActive(pathname, href, exact);
             return (
@@ -103,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={href}
                 href={href}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors",
+                  "relative z-10 flex min-w-0 flex-1 touch-manipulation select-none flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors",
                   active ? "text-brand" : "text-muted",
                 )}
               >
@@ -112,10 +116,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          <form action={logout} className="flex flex-1">
+          <form action={logout} className="relative z-10 flex min-w-0 flex-1">
             <button
               type="submit"
-              className="flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-muted"
+              className="flex min-w-0 flex-1 touch-manipulation select-none flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-muted"
             >
               <IconLogout className="size-6" />
               Выйти
