@@ -109,7 +109,7 @@ export default async function ClientCardPage({
         </div>
 
         {/* Контакты */}
-        {(client.phone || client.telegram || client.instagram) && (
+        {(client.phone || client.telegram || client.telegramUserId || client.instagram) && (
           <div className="mt-4 flex flex-wrap gap-2">
             {client.phone && (
               <a
@@ -129,6 +129,11 @@ export default async function ClientCardPage({
                 <IconSend className="size-4 text-brand" />
                 {client.telegram}
               </a>
+            )}
+            {client.telegramUserId && (
+              <span className="inline-flex items-center rounded-full bg-surface-muted px-3 py-1.5 text-sm text-muted">
+                Telegram ID: {client.telegramUserId}
+              </span>
             )}
             {client.instagram && (
               <a

@@ -329,6 +329,20 @@ async function findOrCreateClient(
         status: "lead",
       },
     });
+  } else {
+    const telegram = user.username ? `@${user.username}` : null;
+    const telegramName = displayName(user);
+    const shouldRefreshGeneratedName =
+      client.fullName === `Telegram ${user.id}` && Boolean(telegramName);
+
+    client = await prisma.client.update({
+      where: { id: client.id },
+      data: {
+        telegramUserId,
+        telegram,
+        ...(shouldRefreshGeneratedName ? { fullName: telegramName! } : {}),
+      },
+    });
   }
 
   await prisma.telegramConversation.update({
