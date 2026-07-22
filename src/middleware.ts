@@ -18,9 +18,10 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-// Защищаем всё, кроме самой страницы входа, статики и иконок.
+// Telegram webhook имеет собственный секрет в заголовке и должен быть доступен Telegram.
+// Всё остальное защищаем паролем кабинета.
 export const config = {
   matcher: [
-    "/((?!login|_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!login|api/telegram/webhook|_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
