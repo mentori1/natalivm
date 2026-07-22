@@ -25,10 +25,13 @@ export const dynamic = "force-dynamic";
 
 export default async function LessonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
   const lessonId = Number(id);
 
   const lesson = await prisma.lesson.findUnique({
@@ -54,6 +57,7 @@ export default async function LessonPage({
   const present = lesson.attendances.filter(
     (a) => a.status === "present",
   ).length;
+  const canEnroll = !lesson.capacity || enrolled < lesson.capacity;
 
   return (
     <div className="space-y-7">
@@ -150,11 +154,17 @@ export default async function LessonPage({
         </form>
       </Card>
 
+      {query.error === "full" && (
+        <Card className="border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+          Записать не получилось: на занятии уже заняты все места.
+        </Card>
+      )}
+
       {/* Список и отметка посещений */}
       <section>
         <SectionTitle
           action={
-            otherClients.length > 0 ? (
+            otherClients.length > 0 && canEnroll ? (
               <Disclosure label="Записать">
                 <Card className="p-4">
                   <form action={enrollClient} className="flex gap-2">
@@ -240,6 +250,11 @@ export default async function LessonPage({
               </div>
             ))}
           </Card>
+        )}
+        {!canEnroll && (
+          <p className="mt-3 px-1 text-sm font-medium text-amber-700">
+            Запись закрыта: заняты все {lesson.capacity} мест.
+          </p>
         )}
         <p className="mt-3 px-1 text-xs text-muted">
           «Была» списывает 1 занятие с активного абонемента нужного типа

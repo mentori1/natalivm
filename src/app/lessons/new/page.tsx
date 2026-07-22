@@ -44,7 +44,7 @@ export default function NewLessonPage() {
                 <option value="online">Онлайн</option>
               </Select>
             </Field>
-            <Field label="Мест" hint="Для индивидуального по умолчанию 1">
+            <Field label="Мест" hint="По умолчанию: онлайн 20, офлайн 8, индивидуальное 1">
               <Input name="capacity" type="number" min={1} placeholder="8" />
             </Field>
             <Field label="Дата и время">

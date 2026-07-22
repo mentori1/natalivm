@@ -498,17 +498,28 @@ export async function deletePriceItem(fd: FormData) {
 }
 
 // ─────────── Занятия ───────────
+function lessonCapacity(
+  format: "group" | "individual",
+  type: "online" | "offline",
+  requested: number,
+) {
+  if (requested > 0) return requested;
+  if (format === "individual") return 1;
+  return type === "online" ? 20 : 8;
+}
+
 export async function createLesson(fd: FormData) {
   const startsAt = wallClockDateTimeOrNull(fd, "startsAt");
   if (!startsAt) return;
   const format = str(fd, "format") === "individual" ? "individual" : "group";
+  const type = str(fd, "type") === "online" ? "online" : "offline";
   const lesson = await prisma.lesson.create({
     data: {
       title: strOrNull(fd, "title"),
-      type: str(fd, "type") === "online" ? "online" : "offline",
+      type,
       format,
       startsAt,
-      capacity: num(fd, "capacity", 0) || (format === "individual" ? 1 : null),
+      capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
     },
   });
   revalidatePath("/lessons");
@@ -520,12 +531,13 @@ export async function updateLessonSettings(fd: FormData) {
   const id = num(fd, "id");
   if (!id) return;
   const format = str(fd, "format") === "individual" ? "individual" : "group";
+  const type = str(fd, "type") === "online" ? "online" : "offline";
   await prisma.lesson.update({
     where: { id },
     data: {
       format,
-      type: str(fd, "type") === "online" ? "online" : "offline",
-      capacity: num(fd, "capacity", 0) || (format === "individual" ? 1 : null),
+      type,
+      capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
     },
   });
   revalidatePath(`/lessons/${id}`);
@@ -546,12 +558,23 @@ export async function enrollClient(fd: FormData) {
   const lessonId = num(fd, "lessonId");
   const clientId = num(fd, "clientId");
   if (!lessonId || !clientId) return;
-  // upsert защищает от дублей (уникальный индекс lessonId+clientId)
-  await prisma.attendance.upsert({
-    where: { lessonId_clientId: { lessonId, clientId } },
-    create: { lessonId, clientId, status: "enrolled" },
-    update: {},
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
+    const lesson = await tx.lesson.findUnique({
+      where: { id: lessonId },
+      include: { attendances: true },
+    });
+    if (!lesson) return "missing" as const;
+    const existing = lesson.attendances.find((item) => item.clientId === clientId);
+    if (existing) return "already" as const;
+    const enrolled = lesson.attendances.filter((item) => item.status !== "absent").length;
+    if (lesson.capacity && enrolled >= lesson.capacity) return "full" as const;
+    await tx.attendance.create({
+      data: { lessonId, clientId, status: "enrolled" },
+    });
+    return "created" as const;
   });
+  if (result === "full") redirect(`/lessons/${lessonId}?error=full`);
   revalidatePath(`/lessons/${lessonId}`);
 }
 
