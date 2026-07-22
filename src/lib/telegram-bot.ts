@@ -140,6 +140,29 @@ function displayName(user?: TelegramUser | TelegramChat) {
   return name || user.username || null;
 }
 
+async function findExistingClientByTelegram(
+  telegramUserId: string,
+  username?: string,
+) {
+  let client = await prisma.client.findUnique({ where: { telegramUserId } });
+  if (!client && username) {
+    const candidates = await prisma.client.findMany({
+      where: { telegram: { not: null } },
+    });
+    client =
+      candidates.find(
+        (candidate) => normalizeHandle(candidate.telegram) === normalizeHandle(username),
+      ) ?? null;
+    if (client && !client.telegramUserId) {
+      client = await prisma.client.update({
+        where: { id: client.id },
+        data: { telegramUserId },
+      });
+    }
+  }
+  return client;
+}
+
 async function getConversation(
   connectionId: string,
   message: TelegramMessage,
@@ -155,6 +178,11 @@ async function getConversation(
   const name = senderIsClient
     ? displayName(from) ?? displayName(message.chat)
     : displayName(message.chat);
+  const existingClient = await findExistingClientByTelegram(
+    telegramUserId,
+    username,
+  );
+  const isBarter = existingClient?.status === "barter";
   return prisma.telegramConversation.upsert({
     where: {
       businessConnectionId_telegramChatId: {
@@ -168,11 +196,18 @@ async function getConversation(
       telegramUserId,
       username: username ?? null,
       displayName: name,
+      clientId: existingClient?.id,
+      state: isBarter ? "closed" : "idle",
+      stopped: isBarter,
     },
     update: {
       telegramUserId,
       username: username ?? undefined,
       displayName: name ?? undefined,
+      clientId: existingClient?.id,
+      ...(isBarter
+        ? { state: "closed", stopped: true, followupDueAt: null }
+        : {}),
     },
   });
 }
@@ -198,6 +233,17 @@ async function sendSchedule(
   chatId: string,
   type: "online" | "offline",
 ) {
+  const conversation = await prisma.telegramConversation.findUnique({
+    where: {
+      businessConnectionId_telegramChatId: {
+        businessConnectionId: connectionId,
+        telegramChatId: chatId,
+      },
+    },
+    include: { client: true },
+  });
+  if (conversation?.stopped || conversation?.client?.status === "barter") return;
+
   const lessons = await prisma.lesson.findMany({
     where: {
       format: "group",
@@ -265,23 +311,7 @@ async function findOrCreateClient(
   user: TelegramUser,
 ) {
   const telegramUserId = String(user.id);
-  let client = await prisma.client.findUnique({ where: { telegramUserId } });
-
-  if (!client && user.username) {
-    const candidates = await prisma.client.findMany({
-      where: { telegram: { not: null } },
-    });
-    client =
-      candidates.find(
-        (candidate) => normalizeHandle(candidate.telegram) === normalizeHandle(user.username),
-      ) ?? null;
-    if (client) {
-      client = await prisma.client.update({
-        where: { id: client.id },
-        data: { telegramUserId },
-      });
-    }
-  }
+  let client = await findExistingClientByTelegram(telegramUserId, user.username);
 
   if (!client) {
     client = await prisma.client.create({
@@ -318,6 +348,13 @@ async function bookLesson(
   });
   if (!conversation || conversation.stopped) return;
   const client = await findOrCreateClient(conversation.id, user);
+  if (client.status === "barter") {
+    await prisma.telegramConversation.update({
+      where: { id: conversation.id },
+      data: { state: "closed", stopped: true, followupDueAt: null },
+    });
+    return;
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
@@ -385,6 +422,19 @@ async function handleOwnerCommand(
     where: { id: conversation.id },
     data: { lastOwnerCommandAt: new Date() },
   });
+  if (conversation.clientId) {
+    const client = await prisma.client.findUnique({
+      where: { id: conversation.clientId },
+      select: { status: true },
+    });
+    if (client?.status === "barter") {
+      await prisma.telegramConversation.update({
+        where: { id: conversation.id },
+        data: { state: "closed", stopped: true, followupDueAt: null },
+      });
+      return;
+    }
+  }
 
   if (text === "/человек") {
     await prisma.telegramConversation.update({
@@ -532,6 +582,10 @@ export async function runScheduledTelegramJobs() {
       stopped: false,
       reminderSentAt: null,
       lastIncomingAt: { lte: reminderThreshold, gte: replyWindow },
+      OR: [
+        { clientId: null },
+        { client: { is: { status: { not: "barter" } } } },
+      ],
     },
   });
 
@@ -552,6 +606,10 @@ export async function runScheduledTelegramJobs() {
       state: { in: ["awaiting_type", "options_sent"] },
       stopped: false,
       followupDueAt: { lte: now },
+      OR: [
+        { clientId: null },
+        { client: { is: { status: { not: "barter" } } } },
+      ],
     },
     include: { tasks: { where: { type: "manual_followup" } } },
   });

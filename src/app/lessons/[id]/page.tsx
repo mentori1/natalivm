@@ -208,12 +208,19 @@ export default async function LessonPage({
                 >
                   <Avatar name={a.client.fullName} size={40} />
                   <div className="min-w-0">
-                    <p className="truncate font-semibold leading-tight text-ink">
-                      {a.client.fullName}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-semibold leading-tight text-ink">
+                        {a.client.fullName}
+                      </p>
+                      {a.client.status === "barter" && (
+                        <Badge tone="blue">Бартер</Badge>
+                      )}
+                    </div>
                     {a.status === "present" && (
                       <p className="text-xs text-muted">
-                        {a.subscriptionId
+                        {a.client.status === "barter"
+                          ? "занятие по бартеру"
+                          : a.subscriptionId
                           ? "списано с абонемента"
                           : "вне абонемента"}
                       </p>
@@ -258,7 +265,7 @@ export default async function LessonPage({
         )}
         <p className="mt-3 px-1 text-xs text-muted">
           «Была» списывает 1 занятие с активного абонемента нужного типа
-          (онлайн/офлайн). Если абонемента нет — отметка ставится как разовое.
+          (онлайн/офлайн). Для бартерных клиенток доход не создаётся.
         </p>
       </section>
     </div>
