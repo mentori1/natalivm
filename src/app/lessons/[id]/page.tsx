@@ -121,61 +121,65 @@ export default async function LessonPage({
           ) : null}
         </div>
 
-        <form
-          action={updateLessonSettings}
-          className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2"
-        >
-          <input type="hidden" name="id" value={lesson.id} />
-          <label className="min-w-0 text-sm font-medium text-ink sm:col-span-2">
-            Название
-            <Input
-              name="title"
-              defaultValue={lesson.title ?? ""}
-              placeholder="Название занятия"
-              className="mt-1"
-            />
-          </label>
-          <label className="min-w-0 text-sm font-medium text-ink">
-            Формат занятия
-            <Select name="format" defaultValue={lesson.format} className="mt-1">
-              <option value="group">Групповое</option>
-              <option value="individual">Индивидуальное</option>
-            </Select>
-          </label>
-          <label className="min-w-0 text-sm font-medium text-ink">
-            Онлайн / офлайн
-            <Select name="type" defaultValue={lesson.type} className="mt-1">
-              <option value="offline">Офлайн</option>
-              <option value="online">Онлайн</option>
-            </Select>
-          </label>
-          <label className="min-w-0 text-sm font-medium text-ink">
-            Количество мест
-            <Input
-              name="capacity"
-              type="number"
-              min={1}
-              defaultValue={lesson.capacity ?? ""}
-              placeholder={lesson.format === "individual" ? "1" : "Укажите для бота"}
-              className="mt-1"
-            />
-          </label>
-          <label className="min-w-0 text-sm font-medium text-ink">
-            Дата и время
-            <Input
-              name="startsAt"
-              type="datetime-local"
-              required
-              defaultValue={datetimeLocalValue(lesson.startsAt)}
-              className="mt-1"
-            />
-          </label>
-          <div className="sm:col-span-2 sm:flex sm:justify-end">
-            <SubmitButton variant="soft" size="md">
-              Сохранить занятие
-            </SubmitButton>
-          </div>
-        </form>
+        <div className="mt-4 border-t border-line pt-4">
+          <Disclosure label="Настройки занятия" variant="ghost">
+            <form
+              action={updateLessonSettings}
+              className="grid gap-3 sm:grid-cols-2"
+            >
+              <input type="hidden" name="id" value={lesson.id} />
+              <label className="min-w-0 text-sm font-medium text-ink sm:col-span-2">
+                Название
+                <Input
+                  name="title"
+                  defaultValue={lesson.title ?? ""}
+                  placeholder="Название занятия"
+                  className="mt-1"
+                />
+              </label>
+              <label className="min-w-0 text-sm font-medium text-ink">
+                Формат занятия
+                <Select name="format" defaultValue={lesson.format} className="mt-1">
+                  <option value="group">Групповое</option>
+                  <option value="individual">Индивидуальное</option>
+                </Select>
+              </label>
+              <label className="min-w-0 text-sm font-medium text-ink">
+                Онлайн / офлайн
+                <Select name="type" defaultValue={lesson.type} className="mt-1">
+                  <option value="offline">Офлайн</option>
+                  <option value="online">Онлайн</option>
+                </Select>
+              </label>
+              <label className="min-w-0 text-sm font-medium text-ink">
+                Количество мест
+                <Input
+                  name="capacity"
+                  type="number"
+                  min={1}
+                  defaultValue={lesson.capacity ?? ""}
+                  placeholder={lesson.format === "individual" ? "1" : "Укажите для бота"}
+                  className="mt-1"
+                />
+              </label>
+              <label className="min-w-0 text-sm font-medium text-ink">
+                Дата и время
+                <Input
+                  name="startsAt"
+                  type="datetime-local"
+                  required
+                  defaultValue={datetimeLocalValue(lesson.startsAt)}
+                  className="mt-1"
+                />
+              </label>
+              <div className="sm:col-span-2 sm:flex sm:justify-end">
+                <SubmitButton variant="soft" size="md">
+                  Сохранить занятие
+                </SubmitButton>
+              </div>
+            </form>
+          </Disclosure>
+        </div>
       </Card>
 
       {query.error === "full" && (
