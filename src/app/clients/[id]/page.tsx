@@ -21,6 +21,7 @@ import {
   effectiveClientStatus,
   remaining,
   formatDate,
+  formatDateTime,
   formatMoney,
   pluralLessons,
   type SubStatus,
@@ -42,6 +43,7 @@ import {
   IconX,
   IconPlus,
   IconChevronRight,
+  IconClock,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +60,11 @@ export default async function ClientCardPage({
     include: {
       subscriptions: {
         orderBy: { createdAt: "desc" },
+      },
+      attendances: {
+        where: { status: "present", subscriptionId: null },
+        include: { lesson: true },
+        orderBy: { lesson: { startsAt: "desc" } },
       },
       singleVisits: { orderBy: { date: "desc" } },
       notes: { orderBy: { createdAt: "desc" } },
@@ -154,7 +161,9 @@ export default async function ClientCardPage({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Посещений всего"
-          value={String(visits + client.singleVisits.length)}
+          value={String(
+            visits + client.singleVisits.length + client.attendances.length,
+          )}
         />
         <Stat
           label="Сумма покупок"
@@ -279,6 +288,41 @@ export default async function ClientCardPage({
           </Card>
         )}
       </section>
+
+      {/* Фактические занятия, которые не списались с абонемента */}
+      {client.attendances.length > 0 && (
+        <section>
+          <SectionTitle>Посещения без абонемента</SectionTitle>
+          <Card className="divide-y divide-line overflow-hidden p-0">
+            {client.attendances.map((attendance) => (
+              <div
+                key={attendance.id}
+                className="flex items-center gap-3 px-4 py-3"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
+                  <IconClock className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-ink">
+                    {formatDateTime(attendance.lesson.startsAt)}
+                  </p>
+                  <p className="truncate text-sm text-muted">
+                    {attendance.lesson.title ?? "Занятие"} ·{" "}
+                    {SUB_TYPE[attendance.lesson.type as SubType].short}
+                  </p>
+                </div>
+                <Badge
+                  tone={
+                    attendance.lesson.type === "online" ? "blue" : "violet"
+                  }
+                >
+                  Без списания
+                </Badge>
+              </div>
+            ))}
+          </Card>
+        </section>
+      )}
 
       {/* Тренажёр */}
       <section>
