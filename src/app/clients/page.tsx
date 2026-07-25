@@ -31,9 +31,20 @@ export default async function ClientsPage({
 }) {
   const { status = "all", q = "" } = await searchParams;
   const query = q.trim();
+  const handleQuery = query.replace(/^@+/, "");
 
   const all = await prisma.client.findMany({
-    where: { ...(query ? { fullName: { contains: query } } : {}) },
+    where: query
+      ? {
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { telegram: { contains: handleQuery, mode: "insensitive" } },
+            { telegramUserId: { equals: handleQuery } },
+            { phone: { contains: query } },
+            { instagram: { contains: handleQuery, mode: "insensitive" } },
+          ],
+        }
+      : undefined,
     include: { subscriptions: true },
     orderBy: [{ fullName: "asc" }],
   });
@@ -76,11 +87,12 @@ export default async function ClientsPage({
 
       {/* Поиск */}
       <form method="get" className="relative">
+        {status !== "all" && <input type="hidden" name="status" value={status} />}
         <input
           type="search"
           name="q"
           defaultValue={query}
-          placeholder="Поиск по имени…"
+          placeholder="Имя, телефон или @username…"
           className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none transition placeholder:text-muted/50 focus:border-brand focus:ring-2 focus:ring-brand/15"
         />
       </form>

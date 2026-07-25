@@ -14,47 +14,47 @@ datasource db {
 
 /// Клиент (ученик)
 model Client {
-  id              Int       @id @default(autoincrement())
-  fullName        String
-  phone           String?
-  telegram        String?
-  telegramUserId  String?   @unique // стабильный Telegram ID для business-бота
-  instagram       String?
-  birthDate       DateTime?
-  firstContact    DateTime  @default(now()) // дата первого контакта
-  source          String? // источник (Instagram, Telegram, сарафан, блогер…)
-  sourceDetail    String? // от кого именно: имя блогера, канал, кампания
+  id                 Int       @id @default(autoincrement())
+  fullName           String
+  phone              String?
+  telegram           String?
+  telegramUserId     String?   @unique // стабильный Telegram ID для business-бота
+  instagram          String?
+  birthDate          DateTime?
+  firstContact       DateTime  @default(now()) // дата первого контакта
+  source             String? // источник (Instagram, Telegram, сарафан, блогер…)
+  sourceDetail       String? // от кого именно: имя блогера, канал, кампания
   // lead | trial | active | expired | inactive | barter
-  status          String    @default("lead")
-  request         String? // с каким запросом пришёл (свободный текст)
+  status             String    @default("lead")
+  request            String? // с каким запросом пришёл (свободный текст)
   // «Рекомендации для преподавателя» — НЕ диагнозы, а что учитывать на занятии
-  recommendations String?
-  lastVisitAt     DateTime? // дата последнего занятия (денормализовано для скорости)
-  hasTrainer      Boolean   @default(false) // купил ли тренажёр для танцев
+  recommendations    String?
+  lastVisitAt        DateTime? // дата последнего занятия (денормализовано для скорости)
+  hasTrainer         Boolean   @default(false) // купил ли тренажёр для танцев
   trainerPurchasedAt DateTime? // когда купил тренажёр
-  trainerProfit   Int? // прибыль с этой продажи тренажёра, ₽ (фиксируется в момент продажи)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  trainerProfit      Int? // прибыль с этой продажи тренажёра, ₽ (фиксируется в момент продажи)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  subscriptions Subscription[]
-  attendances   Attendance[]
-  notes         Note[]
-  goals         ClientGoal[]
-  singleVisits  SingleVisit[]
+  subscriptions         Subscription[]
+  attendances           Attendance[]
+  notes                 Note[]
+  goals                 ClientGoal[]
+  singleVisits          SingleVisit[]
   telegramConversations TelegramConversation[]
 }
 
 /// Разовое или пробное посещение (без абонемента, оплата за визит)
 model SingleVisit {
-  id        Int      @id @default(autoincrement())
-  clientId  Int
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  date      DateTime @default(now())
-  type      String // online | offline
-  kind      String // trial (пробное) | single (разовое)
+  id         Int      @id @default(autoincrement())
+  clientId   Int
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  date       DateTime @default(now())
+  type       String // online | offline
+  kind       String // trial (пробное) | single (разовое)
   tariffName String? // название тарифа на момент продажи
-  amount    Float    @default(0)
-  createdAt DateTime @default(now())
+  amount     Float    @default(0)
+  createdAt  DateTime @default(now())
 
   @@index([clientId])
 }
@@ -66,6 +66,7 @@ model Subscription {
   clientId       Int
   client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   type           String // online | offline
+  format         String    @default("group") // group | individual
   tariffName     String? // название тарифа на момент продажи
   purchasedAt    DateTime  @default(now())
   totalLessons   Int // куплено занятий
@@ -93,6 +94,7 @@ model PriceItem {
   name       String
   kind       String // subscription | single | trial
   type       String // online | offline
+  format     String   @default("group") // group | individual
   price      Int
   minLessons Int?
   active     Boolean  @default(true)
@@ -197,7 +199,7 @@ model TelegramBusinessConnection {
 
 /// Состояние сценария записи в одном личном Telegram-чате.
 model TelegramConversation {
-  id                   Int      @id @default(autoincrement())
+  id                   Int                        @id @default(autoincrement())
   businessConnectionId String
   businessConnection   TelegramBusinessConnection @relation(fields: [businessConnectionId], references: [id], onDelete: Cascade)
   telegramChatId       String
@@ -205,17 +207,17 @@ model TelegramConversation {
   username             String?
   displayName          String?
   clientId             Int?
-  client               Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  state                String   @default("idle") // idle | awaiting_type | options_sent | booked | human_takeover | manual_followup | closed
+  client               Client?                    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  state                String                     @default("idle") // idle | awaiting_type | options_sent | booked | human_takeover | manual_followup | closed
   preferredType        String? // online | offline
   lastIncomingAt       DateTime?
   lastOwnerCommandAt   DateTime?
   lastBotMessageAt     DateTime?
   reminderSentAt       DateTime?
   followupDueAt        DateTime?
-  stopped              Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  stopped              Boolean                    @default(false)
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
 
   tasks BotTask[]
 
@@ -226,16 +228,16 @@ model TelegramConversation {
 
 /// Служебная задача Наталье/администратору, например ручной дожим через 48 часов.
 model BotTask {
-  id                 Int      @id @default(autoincrement())
+  id                 Int                  @id @default(autoincrement())
   conversationId     Int
   conversation       TelegramConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  type               String   @default("manual_followup")
-  status             String   @default("pending") // pending | notified | done | cancelled
+  type               String               @default("manual_followup")
+  status             String               @default("pending") // pending | notified | done | cancelled
   dueAt              DateTime
   notificationSentAt DateTime?
   completedAt        DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   @@index([status, dueAt])
 }

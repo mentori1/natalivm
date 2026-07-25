@@ -6,6 +6,7 @@ export type PriceOption = {
   name: string;
   kind: string;
   type: string;
+  format: string;
   price: number;
   minLessons: number | null;
   active: boolean;

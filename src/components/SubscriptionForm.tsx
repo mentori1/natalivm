@@ -21,6 +21,7 @@ export function SubscriptionForm({
   const initial = options[0] ?? null;
   const [priceItemId, setPriceItemId] = useState(initial?.id ?? 0);
   const [type, setType] = useState(initial?.type ?? "offline");
+  const [format, setFormat] = useState(initial?.format ?? "group");
   const [tariffName, setTariffName] = useState(initial?.name ?? "");
   const [price, setPrice] = useState(initial?.price ?? 1500);
   const [lessons, setLessons] = useState(initial?.minLessons ?? 4);
@@ -34,6 +35,7 @@ export function SubscriptionForm({
     }
     if (!selected) return;
     setType(selected.type);
+    setFormat(selected.format);
     setTariffName(selected.name);
     setPrice(selected.price);
     setLessons((current) => Math.max(current, selected.minLessons ?? 4));
@@ -44,6 +46,7 @@ export function SubscriptionForm({
       <form action={createSubscription} className="space-y-4">
         <input type="hidden" name="clientId" value={clientId} />
         <input type="hidden" name="type" value={type} />
+        <input type="hidden" name="format" value={format} />
         <input type="hidden" name="tariffName" value={tariffName} />
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -62,7 +65,7 @@ export function SubscriptionForm({
               ))}
             </Select>
           </Field>
-          <Field label="Формат">
+          <Field label="Проведение">
             <Select
               value={type}
               onChange={(e) => {
@@ -73,6 +76,19 @@ export function SubscriptionForm({
             >
               <option value="offline">Офлайн</option>
               <option value="online">Онлайн</option>
+            </Select>
+          </Field>
+          <Field label="Формат занятия">
+            <Select
+              value={format}
+              onChange={(e) => {
+                setFormat(e.target.value);
+                setPriceItemId(0);
+                setTariffName("");
+              }}
+            >
+              <option value="group">Групповой</option>
+              <option value="individual">Индивидуальный</option>
             </Select>
           </Field>
           <Field label="Куплено занятий" hint="Минимум 4">

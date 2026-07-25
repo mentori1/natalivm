@@ -15,13 +15,18 @@ import {
   type LessonFormat,
   type SubType,
 } from "@/lib/domain";
-import { Avatar, Badge, Card, SectionTitle, buttonClass } from "@/components/ui";
+import { Avatar, Badge, Card, SectionTitle } from "@/components/ui";
 import { Input, Select, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { IconArrowLeft, IconCheck, IconX } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
+
+function datetimeLocalValue(d: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
 
 export default async function LessonPage({
   params,
@@ -118,9 +123,18 @@ export default async function LessonPage({
 
         <form
           action={updateLessonSettings}
-          className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-3"
+          className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2"
         >
           <input type="hidden" name="id" value={lesson.id} />
+          <label className="min-w-0 text-sm font-medium text-ink sm:col-span-2">
+            Название
+            <Input
+              name="title"
+              defaultValue={lesson.title ?? ""}
+              placeholder="Название занятия"
+              className="mt-1"
+            />
+          </label>
           <label className="min-w-0 text-sm font-medium text-ink">
             Формат занятия
             <Select name="format" defaultValue={lesson.format} className="mt-1">
@@ -146,9 +160,19 @@ export default async function LessonPage({
               className="mt-1"
             />
           </label>
-          <div className="sm:col-span-3 sm:flex sm:justify-end">
+          <label className="min-w-0 text-sm font-medium text-ink">
+            Дата и время
+            <Input
+              name="startsAt"
+              type="datetime-local"
+              required
+              defaultValue={datetimeLocalValue(lesson.startsAt)}
+              className="mt-1"
+            />
+          </label>
+          <div className="sm:col-span-2 sm:flex sm:justify-end">
             <SubmitButton variant="soft" size="md">
-              Сохранить настройки
+              Сохранить занятие
             </SubmitButton>
           </div>
         </form>

@@ -92,6 +92,7 @@ export type PriceItemLike = {
   name: string;
   kind: PriceKind;
   type: SubType;
+  format: "group" | "individual";
   price: number;
   minLessons: number | null;
   active: boolean;
@@ -103,6 +104,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Групповой абонемент",
     kind: "subscription",
     type: "offline",
+    format: "group",
     price: 1500,
     minLessons: 4,
     active: true,
@@ -112,6 +114,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Групповой абонемент",
     kind: "subscription",
     type: "online",
+    format: "group",
     price: 1200,
     minLessons: 4,
     active: true,
@@ -121,6 +124,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Индивидуальный абонемент",
     kind: "subscription",
     type: "online",
+    format: "individual",
     price: 2600,
     minLessons: 4,
     active: true,
@@ -130,6 +134,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Индивидуальный абонемент",
     kind: "subscription",
     type: "offline",
+    format: "individual",
     price: 5000,
     minLessons: 4,
     active: true,
@@ -139,6 +144,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Пробное занятие",
     kind: "trial",
     type: "offline",
+    format: "group",
     price: 1000,
     minLessons: null,
     active: true,
@@ -148,6 +154,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Пробное занятие",
     kind: "trial",
     type: "online",
+    format: "group",
     price: 500,
     minLessons: null,
     active: true,
@@ -157,6 +164,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Разовое групповое занятие",
     kind: "single",
     type: "offline",
+    format: "group",
     price: 2300,
     minLessons: null,
     active: true,
@@ -166,6 +174,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Разовое групповое занятие",
     kind: "single",
     type: "online",
+    format: "group",
     price: 2300,
     minLessons: null,
     active: true,
@@ -175,6 +184,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Индивидуальное занятие",
     kind: "single",
     type: "online",
+    format: "individual",
     price: 3000,
     minLessons: null,
     active: true,
@@ -184,6 +194,7 @@ export const DEFAULT_PRICE_ITEMS: PriceItemLike[] = [
     name: "Индивидуальное занятие",
     kind: "single",
     type: "offline",
+    format: "individual",
     price: 5500,
     minLessons: null,
     active: true,

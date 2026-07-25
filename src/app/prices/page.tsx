@@ -53,11 +53,11 @@ function PriceFormatGroup({
   const groups = [
     {
       title: "Индивидуальные",
-      items: items.filter((item) => isIndividual(item)),
+      items: items.filter((item) => item.format === "individual"),
     },
     {
       title: "Групповые",
-      items: items.filter((item) => !isIndividual(item) && item.kind !== "trial"),
+      items: items.filter((item) => item.format === "group" && item.kind !== "trial"),
     },
     {
       title: "Пробные",
@@ -127,15 +127,12 @@ type PriceItem = {
   name: string;
   kind: string;
   type: string;
+  format: string;
   price: number;
   minLessons: number | null;
   active: boolean;
   sortOrder: number;
 };
-
-function isIndividual(item: { name: string }) {
-  return item.name.toLowerCase().includes("индивиду");
-}
 
 function compactTitle(item: {
   name: string;
@@ -162,6 +159,7 @@ function PriceForm({
     name: string;
     kind: string;
     type: string;
+    format: string;
     price: number;
     minLessons: number | null;
     active: boolean;
@@ -187,10 +185,16 @@ function PriceForm({
           <option value="trial">Пробное</option>
         </Select>
       </Field>
-      <Field label="Формат">
+      <Field label="Проведение">
         <Select name="type" defaultValue={item?.type ?? "offline"}>
           <option value="offline">Офлайн</option>
           <option value="online">Онлайн</option>
+        </Select>
+      </Field>
+      <Field label="Формат занятия">
+        <Select name="format" defaultValue={item?.format ?? "group"}>
+          <option value="group">Групповое</option>
+          <option value="individual">Индивидуальное</option>
         </Select>
       </Field>
       <Field label="Цена, ₽">

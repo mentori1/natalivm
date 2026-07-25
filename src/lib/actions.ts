@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { findClientDuplicates } from "@/lib/queries";
 import {
+  currentMoscowWallClockDate,
   derivedSubStatus,
   isUsable,
   remaining,
@@ -52,6 +53,10 @@ function priceKind(fd: FormData): PriceKind {
 
 function subType(fd: FormData): SubType {
   return str(fd, "type") === "online" ? "online" : "offline";
+}
+
+function lessonFormat(fd: FormData): "group" | "individual" {
+  return str(fd, "format") === "individual" ? "individual" : "group";
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -202,12 +207,14 @@ export async function createSubscription(fd: FormData) {
     dateOrNull(fd, "expiresAt") ??
     new Date(purchasedAt.getTime() + termDays * DAY);
   const type = tariff ? tariff.type : subType(fd);
+  const format = tariff ? tariff.format : lessonFormat(fd);
   const pricePerLesson = num(fd, "pricePerLesson", tariff?.price ?? 0);
 
   await prisma.subscription.create({
     data: {
       clientId,
       type,
+      format,
       tariffName: tariff ? tariff.name : strOrNull(fd, "tariffName"),
       totalLessons,
       usedLessons: 0,
@@ -459,6 +466,7 @@ export async function createPriceItem(fd: FormData) {
       name: str(fd, "name") || "Новый тариф",
       kind,
       type: subType(fd),
+      format: lessonFormat(fd),
       price: Math.max(0, num(fd, "price", 0)),
       minLessons,
       active: fd.get("active") === "on",
@@ -481,6 +489,7 @@ export async function updatePriceItem(fd: FormData) {
       name: str(fd, "name") || "Тариф",
       kind,
       type: subType(fd),
+      format: lessonFormat(fd),
       price: Math.max(0, num(fd, "price", 0)),
       minLessons,
       active: fd.get("active") === "on",
@@ -511,7 +520,7 @@ function lessonCapacity(
 export async function createLesson(fd: FormData) {
   const startsAt = wallClockDateTimeOrNull(fd, "startsAt");
   if (!startsAt) return;
-  const format = str(fd, "format") === "individual" ? "individual" : "group";
+  const format = lessonFormat(fd);
   const type = str(fd, "type") === "online" ? "online" : "offline";
   const lesson = await prisma.lesson.create({
     data: {
@@ -522,6 +531,7 @@ export async function createLesson(fd: FormData) {
       capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
     },
   });
+  await autoEnrollGroupOnlineSubscribers(lesson.id);
   revalidatePath("/lessons");
   revalidatePath("/");
   redirect(`/lessons/${lesson.id}`);
@@ -530,19 +540,77 @@ export async function createLesson(fd: FormData) {
 export async function updateLessonSettings(fd: FormData) {
   const id = num(fd, "id");
   if (!id) return;
-  const format = str(fd, "format") === "individual" ? "individual" : "group";
+  const format = lessonFormat(fd);
   const type = str(fd, "type") === "online" ? "online" : "offline";
+  const startsAt = wallClockDateTimeOrNull(fd, "startsAt");
   await prisma.lesson.update({
     where: { id },
     data: {
+      title: strOrNull(fd, "title"),
       format,
       type,
+      ...(startsAt ? { startsAt } : {}),
       capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
     },
   });
+  await autoEnrollGroupOnlineSubscribers(id);
   revalidatePath(`/lessons/${id}`);
   revalidatePath("/lessons");
   revalidatePath("/");
+}
+
+async function autoEnrollGroupOnlineSubscribers(lessonId: number) {
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: {
+      id: true,
+      type: true,
+      format: true,
+      startsAt: true,
+      capacity: true,
+      attendances: { select: { clientId: true, status: true } },
+    },
+  });
+  if (
+    !lesson ||
+    lesson.type !== "online" ||
+    lesson.format !== "group" ||
+    lesson.startsAt < currentMoscowWallClockDate()
+  ) {
+    return;
+  }
+
+  const subscriptions = await prisma.subscription.findMany({
+    where: {
+      type: "online",
+      format: "group",
+      frozen: false,
+      expiresAt: { gte: lesson.startsAt },
+      client: { status: { notIn: ["barter", "inactive"] } },
+    },
+    orderBy: [{ expiresAt: "asc" }, { id: "asc" }],
+  });
+  const existing = new Set(lesson.attendances.map((item) => item.clientId));
+  const enrolled = lesson.attendances.filter((item) => item.status !== "absent").length;
+  const slots = lesson.capacity ? Math.max(0, lesson.capacity - enrolled) : Infinity;
+  const clientIds = [
+    ...new Set(
+      subscriptions
+        .filter((sub) => isUsable(sub, lesson.startsAt) && remaining(sub) > 0)
+        .map((sub) => sub.clientId)
+        .filter((clientId) => !existing.has(clientId)),
+    ),
+  ].slice(0, slots);
+
+  if (clientIds.length === 0) return;
+  await prisma.attendance.createMany({
+    data: clientIds.map((clientId) => ({
+      lessonId,
+      clientId,
+      status: "enrolled",
+    })),
+    skipDuplicates: true,
+  });
 }
 
 export async function deleteLesson(fd: FormData) {
