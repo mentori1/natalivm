@@ -23,6 +23,7 @@ import { Avatar, Badge, Card, SectionTitle, EmptyState } from "@/components/ui";
 import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { VisitCalendar } from "@/components/VisitCalendar";
+import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 import {
   IconArrowLeft,
   IconSnow,
@@ -269,7 +270,10 @@ export default async function SubscriptionPage({
 
       {/* Удаление */}
       <div className="flex justify-center border-t border-line pt-6">
-        <form action={deleteSubscription}>
+        <ConfirmActionForm
+          action={deleteSubscription}
+          message="Удалить этот абонемент?\n\nУдалятся его ручная история посещений и связи со списанными занятиями. Это действие нельзя отменить."
+        >
           <input type="hidden" name="id" value={sub.id} />
           <SubmitButton
             variant="ghost"
@@ -278,7 +282,7 @@ export default async function SubscriptionPage({
           >
             Удалить абонемент
           </SubmitButton>
-        </form>
+        </ConfirmActionForm>
       </div>
     </div>
   );

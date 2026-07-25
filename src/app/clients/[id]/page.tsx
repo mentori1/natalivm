@@ -32,6 +32,7 @@ import { Disclosure } from "@/components/Disclosure";
 import { SubscriptionForm } from "@/components/SubscriptionForm";
 import { SingleVisitForm } from "@/components/SingleVisitForm";
 import { DeleteClientButton } from "@/components/DeleteClientButton";
+import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 import {
   IconArrowLeft,
   IconPhone,
@@ -259,7 +260,10 @@ export default async function ClientCardPage({
                     {formatDate(v.date)} · {formatMoney(v.amount)}
                   </p>
                 </div>
-                <form action={deleteSingleVisit}>
+                <ConfirmActionForm
+                  action={deleteSingleVisit}
+                  message={`Удалить ${SINGLE_VISIT_KIND[v.kind]?.label.toLowerCase() ?? "визит"} от ${formatDate(v.date)}?\n\nДоход от этого визита также исчезнет из финансов.`}
+                >
                   <input type="hidden" name="id" value={v.id} />
                   <input type="hidden" name="clientId" value={client.id} />
                   <button
@@ -269,7 +273,7 @@ export default async function ClientCardPage({
                   >
                     <IconX className="size-4" />
                   </button>
-                </form>
+                </ConfirmActionForm>
               </div>
             ))}
           </Card>
@@ -297,12 +301,15 @@ export default async function ClientCardPage({
                   </p>
                 )}
               </div>
-              <form action={toggleTrainer}>
+              <ConfirmActionForm
+                action={toggleTrainer}
+                message="Отменить покупку тренажёра?\n\nДата покупки и прибыль от этой продажи будут удалены из финансов."
+              >
                 <input type="hidden" name="clientId" value={client.id} />
                 <SubmitButton variant="ghost" size="sm">
                   Отменить
                 </SubmitButton>
-              </form>
+              </ConfirmActionForm>
             </div>
           ) : (
             <div className="space-y-3">
@@ -352,7 +359,10 @@ export default async function ClientCardPage({
                   className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 py-1 pr-1.5 pl-3 text-sm text-violet-700"
                 >
                   {g.text}
-                  <form action={deleteGoal}>
+                  <ConfirmActionForm
+                    action={deleteGoal}
+                    message={`Удалить цель «${g.text}»?`}
+                  >
                     <input type="hidden" name="id" value={g.id} />
                     <input type="hidden" name="clientId" value={client.id} />
                     <button
@@ -362,7 +372,7 @@ export default async function ClientCardPage({
                     >
                       <IconX className="size-3.5" />
                     </button>
-                  </form>
+                  </ConfirmActionForm>
                 </span>
               ))}
             </div>
@@ -416,7 +426,10 @@ export default async function ClientCardPage({
                       {formatDate(n.createdAt)}
                     </p>
                   </div>
-                  <form action={deleteNote}>
+                  <ConfirmActionForm
+                    action={deleteNote}
+                    message="Удалить эту заметку?\n\nЭто действие нельзя отменить."
+                  >
                     <input type="hidden" name="id" value={n.id} />
                     <input type="hidden" name="clientId" value={client.id} />
                     <button
@@ -426,7 +439,7 @@ export default async function ClientCardPage({
                     >
                       <IconX className="size-4" />
                     </button>
-                  </form>
+                  </ConfirmActionForm>
                 </li>
               ))}
             </ul>

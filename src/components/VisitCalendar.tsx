@@ -79,7 +79,17 @@ export function VisitCalendar({
               key={i}
               type="button"
               disabled={pending}
-              onClick={() => startT(() => toggleVisit(subId, ds))}
+              onClick={() => {
+                if (
+                  active &&
+                  !window.confirm(
+                    `Удалить посещение за ${pad(d)}.${pad(view.m + 1)}.${view.y}?\n\nИспользованное занятие вернётся в абонемент.`,
+                  )
+                ) {
+                  return;
+                }
+                startT(() => toggleVisit(subId, ds));
+              }}
               className={cn(
                 "flex aspect-square items-center justify-center rounded-lg text-sm transition-colors",
                 active

@@ -8,6 +8,7 @@ import { formatMoney } from "@/lib/domain";
 import { Badge, Card, PageHeader, SectionTitle } from "@/components/ui";
 import { Field, Input, Select, SubmitButton } from "@/components/form";
 import { IconPlus, IconX } from "@/components/icons";
+import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +106,10 @@ function PriceRow({ item }: { item: PriceItem }) {
       <div className="border-t border-line bg-white/70 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink">Редактирование</p>
-          <form action={deletePriceItem}>
+          <ConfirmActionForm
+            action={deletePriceItem}
+            message={`Удалить тариф «${item.name}»?\n\nСтарые покупки сохранятся, но тариф исчезнет из прайса. Это действие нельзя отменить.`}
+          >
             <input type="hidden" name="id" value={item.id} />
             <button
               type="submit"
@@ -114,7 +118,7 @@ function PriceRow({ item }: { item: PriceItem }) {
             >
               <IconX className="size-4" />
             </button>
-          </form>
+          </ConfirmActionForm>
         </div>
         <PriceForm action={updatePriceItem} item={item} submit="Сохранить" />
       </div>

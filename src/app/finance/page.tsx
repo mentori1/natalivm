@@ -15,6 +15,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { IconX, IconSparkle } from "@/components/icons";
+import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 
 export const dynamic = "force-dynamic";
 
@@ -247,7 +248,10 @@ export default async function FinancePage({
                   <span className="font-semibold text-red-500">
                     −{formatMoney(e.amount)}
                   </span>
-                  <form action={deleteExpense}>
+                  <ConfirmActionForm
+                    action={deleteExpense}
+                    message={`Удалить расход «${e.title}» на ${formatMoney(e.amount)}?\n\nЭто действие нельзя отменить.`}
+                  >
                     <input type="hidden" name="id" value={e.id} />
                     <button
                       type="submit"
@@ -256,7 +260,7 @@ export default async function FinancePage({
                     >
                       <IconX className="size-4" />
                     </button>
-                  </form>
+                  </ConfirmActionForm>
                 </div>
               </div>
             ))}

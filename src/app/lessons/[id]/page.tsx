@@ -18,6 +18,7 @@ import {
 import { Avatar, Badge, Card, SectionTitle } from "@/components/ui";
 import { Input, Select, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
+import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 import { IconArrowLeft, IconCheck, IconX } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
@@ -92,7 +93,10 @@ export default async function LessonPage({
               {formatDateTime(lesson.startsAt)}
             </p>
           </div>
-          <form action={deleteLesson}>
+          <ConfirmActionForm
+            action={deleteLesson}
+            message={`Удалить занятие «${lesson.title ?? "Занятие"}»?\n\nУдалятся все записи и отметки посещаемости этого занятия. Это действие нельзя отменить.`}
+          >
             <input type="hidden" name="id" value={lesson.id} />
             <SubmitButton
               variant="ghost"
@@ -101,7 +105,7 @@ export default async function LessonPage({
             >
               Удалить
             </SubmitButton>
-          </form>
+          </ConfirmActionForm>
         </div>
 
         <div className="mt-4 flex gap-6">
@@ -270,7 +274,10 @@ export default async function LessonPage({
                     target="absent"
                     active={a.status === "absent"}
                   />
-                  <form action={unenrollClient}>
+                  <ConfirmActionForm
+                    action={unenrollClient}
+                    message={`Убрать ${a.client.fullName} из этого занятия?\n\nЕсли посещение уже было списано, оно вернётся в абонемент.`}
+                  >
                     <input type="hidden" name="id" value={a.id} />
                     <input type="hidden" name="lessonId" value={lesson.id} />
                     <button
@@ -280,7 +287,7 @@ export default async function LessonPage({
                     >
                       <IconX className="size-4" />
                     </button>
-                  </form>
+                  </ConfirmActionForm>
                 </div>
               </div>
             ))}
