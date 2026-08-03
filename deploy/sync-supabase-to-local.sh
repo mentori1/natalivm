@@ -45,6 +45,7 @@ const dotenv = require("dotenv");
 dotenv.config({ path: process.argv[2], quiet: true });
 const url = new URL(process.env.DATABASE_URL);
 url.pathname = `/${process.argv[3]}`;
+for (const key of ["schema", "pgbouncer", "connection_limit", "pool_timeout"]) url.searchParams.delete(key);
 process.stdout.write(url.toString());
 NODE
 )"
