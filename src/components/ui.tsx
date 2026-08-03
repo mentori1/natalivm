@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import Image from "next/image";
 import { cn } from "@/lib/cn";
-import { initials as makeInitials, type Tone } from "@/lib/domain";
+import { type Tone } from "@/lib/domain";
+
+export { Avatar } from "@/components/Avatar";
 
 const TONE: Record<Tone, string> = {
   green: "bg-green-50 text-green-700 ring-green-600/15",
@@ -30,36 +31,6 @@ export function Badge({
       )}
     >
       {children}
-    </span>
-  );
-}
-
-export function Avatar({
-  name,
-  size = 44,
-  src,
-}: {
-  name: string;
-  size?: number;
-  src?: string | null;
-}) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-brand-soft font-semibold text-brand-dark uppercase"
-      style={{ width: size, height: size, fontSize: size * 0.36 }}
-    >
-      {src ? (
-        <Image
-          src={src}
-          alt={name}
-          width={size}
-          height={size}
-          unoptimized
-          className="size-full rounded-full object-cover"
-        />
-      ) : (
-        makeInitials(name)
-      )}
     </span>
   );
 }
