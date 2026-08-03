@@ -40,6 +40,14 @@ for (const key of ["pgbouncer", "connection_limit", "pool_timeout"]) url.searchP
 process.stdout.write(url.toString());
 NODE
 )"
+import_url="$(cd "$app_dir" && node - "$local_env" "$import_database" <<'NODE'
+const dotenv = require("dotenv");
+dotenv.config({ path: process.argv[2], quiet: true });
+const url = new URL(process.env.DATABASE_URL);
+url.pathname = `/${process.argv[3]}`;
+process.stdout.write(url.toString());
+NODE
+)"
 
 mkdir -p "$backup_dir"
 chown root:postgres "$backup_dir"
@@ -68,14 +76,12 @@ runuser -u postgres -- "$pg_bin/dropdb" --if-exists --force "$import_database" >
 runuser -u postgres -- "$pg_bin/createdb" --owner="$app_role" "$import_database"
 runuser -u postgres -- "$pg_bin/psql" -X -v ON_ERROR_STOP=1 -d "$import_database" \
   -c "DROP SCHEMA public CASCADE" >/dev/null
-runuser -u postgres -- "$pg_bin/pg_restore" \
+"$pg_bin/pg_restore" \
   --exit-on-error \
   --no-owner \
   --no-privileges \
-  --dbname="$import_database" \
+  --dbname="$import_url" \
   "$dump"
-runuser -u postgres -- "$pg_bin/psql" -X -v ON_ERROR_STOP=1 -d "$import_database" \
-  -c "REASSIGN OWNED BY postgres TO $app_role" >/dev/null
 
 # Сравниваем не только количество, но и содержимое каждой строки.
 total=0
