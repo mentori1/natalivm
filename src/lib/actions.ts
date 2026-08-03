@@ -531,7 +531,7 @@ export async function createLesson(fd: FormData) {
       capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
     },
   });
-  await autoEnrollGroupOnlineSubscribers(lesson.id);
+  await autoEnrollGroupSubscribers(lesson.id);
   revalidatePath("/lessons");
   revalidatePath("/");
   redirect(`/lessons/${lesson.id}`);
@@ -553,13 +553,13 @@ export async function updateLessonSettings(fd: FormData) {
       capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
     },
   });
-  await autoEnrollGroupOnlineSubscribers(id);
+  await autoEnrollGroupSubscribers(id);
   revalidatePath(`/lessons/${id}`);
   revalidatePath("/lessons");
   revalidatePath("/");
 }
 
-async function autoEnrollGroupOnlineSubscribers(lessonId: number) {
+async function autoEnrollGroupSubscribers(lessonId: number) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     select: {
@@ -573,7 +573,6 @@ async function autoEnrollGroupOnlineSubscribers(lessonId: number) {
   });
   if (
     !lesson ||
-    lesson.type !== "online" ||
     lesson.format !== "group" ||
     lesson.startsAt < currentMoscowWallClockDate()
   ) {
@@ -582,7 +581,7 @@ async function autoEnrollGroupOnlineSubscribers(lessonId: number) {
 
   const subscriptions = await prisma.subscription.findMany({
     where: {
-      type: "online",
+      type: lesson.type,
       format: "group",
       frozen: false,
       expiresAt: { gte: lesson.startsAt },
