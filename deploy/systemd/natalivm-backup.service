@@ -1,5 +1,5 @@
 [Unit]
-Description=VUMEXCLUSIVE Supabase backup and integrity check
+Description=VUMEXCLUSIVE database backup and restore check
 After=network-online.target
 Wants=network-online.target
 

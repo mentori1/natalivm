@@ -46,8 +46,6 @@ chmod 600 "$output.sha256"
 # Полное пробное восстановление подтверждает, что архив реально пригоден для отката.
 runuser -u postgres -- "$pg_bin/dropdb" --if-exists --force "$restore_database" >/dev/null
 runuser -u postgres -- "$pg_bin/createdb" "$restore_database"
-runuser -u postgres -- "$pg_bin/psql" -X -v ON_ERROR_STOP=1 -d "$restore_database" \
-  -c "DROP SCHEMA public CASCADE" >/dev/null
 runuser -u postgres -- "$pg_bin/pg_restore" \
   --exit-on-error \
   --no-owner \
