@@ -42,7 +42,8 @@ NODE
 )"
 
 mkdir -p "$backup_dir"
-chmod 700 "$backup_dir"
+chown root:postgres "$backup_dir"
+chmod 750 "$backup_dir"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 dump="$backup_dir/supabase-${stamp}.dump"
 temporary="$backup_dir/.supabase-${stamp}.dump.tmp"
@@ -58,6 +59,8 @@ PGCONNECT_TIMEOUT=20 "$pg_bin/pg_dump" \
 chmod 600 "$temporary"
 "$pg_bin/pg_restore" --list "$temporary" >/dev/null
 mv "$temporary" "$dump"
+chown root:postgres "$dump"
+chmod 640 "$dump"
 sha256sum "$dump" | sed "s#  $dump#  $(basename "$dump")#" > "$dump.sha256"
 chmod 600 "$dump.sha256"
 

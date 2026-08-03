@@ -21,7 +21,8 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$backup_dir"
-chmod 700 "$backup_dir"
+chown root:postgres "$backup_dir"
+chmod 750 "$backup_dir"
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 filename="dance-crm-postgres-${stamp}.dump"
@@ -37,6 +38,8 @@ runuser -u postgres -- "$pg_bin/pg_dump" \
 chmod 600 "$temporary"
 "$pg_bin/pg_restore" --list "$temporary" >/dev/null
 mv "$temporary" "$output"
+chown root:postgres "$output"
+chmod 640 "$output"
 sha256sum "$output" | sed "s#  $output#  $filename#" > "$output.sha256"
 chmod 600 "$output.sha256"
 
