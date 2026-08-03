@@ -4,11 +4,30 @@ dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.bot.local", override: true });
 
 async function main() {
-  const { handleTelegramUpdate, runScheduledTelegramJobs, telegramApi } =
+  const {
+    handleTelegramUpdate,
+    runScheduledTelegramJobs,
+    syncTelegramBotProfile,
+    telegramApi,
+  } =
     await import("../../src/lib/telegram-bot");
   type Update = Parameters<typeof handleTelegramUpdate>[0];
 
   const me = await telegramApi<{ username?: string }>("getMe");
+  await syncTelegramBotProfile().catch((error) => {
+    console.error(
+      `Не удалось обновить профиль бота: ${error instanceof Error ? error.message : error}`,
+    );
+  });
+  if (process.env.TELEGRAM_LOCAL_POLLING === "1") {
+    await telegramApi<boolean>("deleteWebhook", { drop_pending_updates: true });
+    await telegramApi<boolean>("setMyCommands", {
+      commands: [
+        { command: "start", description: "Открыть главное меню" },
+        { command: "menu", description: "Показать меню" },
+      ],
+    });
+  }
   console.log(`Бот @${me.username ?? "unknown"} запущен. Остановить: Ctrl+C`);
 
   let offset = 0;
@@ -21,6 +40,7 @@ async function main() {
         timeout: 25,
         allowed_updates: [
           "message",
+          "channel_post",
           "business_connection",
           "business_message",
           "edited_business_message",

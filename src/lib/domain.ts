@@ -220,6 +220,25 @@ export function normalizePhone(v: string | null | undefined): string {
   return digits.length > 10 ? digits.slice(-10) : digits;
 }
 
+/** Приводит российский номер к виду +7 (999) 123-45-67, сохраняя неполный ввод. */
+export function formatRussianPhone(v: string | null | undefined): string {
+  let digits = (v ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("8")) digits = `7${digits.slice(1)}`;
+  else if (!digits.startsWith("7")) digits = `7${digits}`;
+  digits = digits.slice(0, 11);
+
+  const local = digits.slice(1);
+  let result = "+7";
+  if (!local) return result;
+  result += ` (${local.slice(0, 3)}`;
+  if (local.length >= 3) result += ")";
+  if (local.length > 3) result += ` ${local.slice(3, 6)}`;
+  if (local.length > 6) result += `-${local.slice(6, 8)}`;
+  if (local.length > 8) result += `-${local.slice(8, 10)}`;
+  return result;
+}
+
 /** Юзернейм (Telegram/Instagram) → без «@», в нижнем регистре. */
 export function normalizeHandle(v: string | null | undefined): string {
   return (v ?? "").trim().replace(/^@+/, "").toLowerCase();

@@ -1,107 +1,34 @@
-import { prisma } from "@/lib/db";
+import { prisma, usesPostgres } from "@/lib/db";
 import {
   currentMoscowWallClockDate,
   formatDateTime,
   normalizeHandle,
 } from "@/lib/domain";
+import {
+  telegramAdminIds,
+  telegramApi,
+  telegramDisplayName,
+  type TelegramCallbackQuery,
+  type TelegramChat,
+  type TelegramMessage,
+  type TelegramUpdate,
+  type TelegramUser,
+} from "@/lib/telegram-api";
+import {
+  handleClientBotCallback,
+  handleClientBotMessage,
+  runClientBookingReminders,
+} from "@/lib/telegram-client-bot";
+import { handleTelegramChannelPost } from "@/lib/telegram-channel";
 
-type TelegramUser = {
-  id: number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-};
-
-type TelegramChat = {
-  id: number;
-  type: string;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-};
-
-type TelegramMessage = {
-  message_id: number;
-  from?: TelegramUser;
-  sender_business_bot?: TelegramUser;
-  chat: TelegramChat;
-  date: number;
-  text?: string;
-  business_connection_id?: string;
-};
-
-type TelegramCallbackQuery = {
-  id: string;
-  from: TelegramUser;
-  message?: TelegramMessage;
-  data?: string;
-};
-
-type TelegramBusinessConnection = {
-  id: string;
-  user: TelegramUser;
-  is_enabled: boolean;
-};
-
-export type TelegramUpdate = {
-  update_id: number;
-  message?: TelegramMessage;
-  business_connection?: TelegramBusinessConnection;
-  business_message?: TelegramMessage;
-  callback_query?: TelegramCallbackQuery;
-};
-
-type TelegramApiResponse<T> = {
-  ok: boolean;
-  result?: T;
-  description?: string;
-};
+export type { TelegramUpdate } from "@/lib/telegram-api";
+export { telegramApi } from "@/lib/telegram-api";
+export { syncTelegramBotProfile } from "@/lib/telegram-channel";
 
 const HOUR = 60 * 60 * 1000;
 
-function botToken() {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  if (!token || token.includes("ВСТАВЬ_")) {
-    throw new Error("TELEGRAM_BOT_TOKEN не задан в .env.bot.local");
-  }
-  return token;
-}
-
 function adminIds() {
-  return new Set(
-    (process.env.TELEGRAM_ADMIN_IDS ?? "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  );
-}
-
-export async function telegramApi<T>(
-  method: string,
-  payload: Record<string, unknown> = {},
-): Promise<T> {
-  const response = await fetch(`https://api.telegram.org/bot${botToken()}/${method}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = (await response.json()) as TelegramApiResponse<T>;
-  if (!response.ok || !data.ok || data.result === undefined) {
-    throw new Error(data.description || `Telegram API: ${method} failed`);
-  }
-  return data.result;
-}
-
-async function sendDirectMessage(
-  chatId: string,
-  text: string,
-  replyMarkup?: Record<string, unknown>,
-) {
-  return telegramApi<TelegramMessage>("sendMessage", {
-    chat_id: chatId,
-    text,
-    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-  });
+  return telegramAdminIds();
 }
 
 async function sendBusinessMessage(
@@ -135,9 +62,7 @@ async function deleteOwnerCommand(connectionId: string, messageId: number) {
 }
 
 function displayName(user?: TelegramUser | TelegramChat) {
-  if (!user) return null;
-  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
-  return name || user.username || null;
+  return telegramDisplayName(user);
 }
 
 async function findExistingClientByTelegram(
@@ -377,7 +302,9 @@ async function bookLesson(
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
+    if (usesPostgres) {
+      await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
+    }
     const lesson = await tx.lesson.findUnique({
       where: { id: lessonId },
       include: { attendances: true },
@@ -563,20 +490,16 @@ async function processUpdate(update: TelegramUpdate) {
     });
   }
 
-  if (update.message?.text?.trim().toLowerCase() === "/start") {
-    const id = String(update.message.from?.id ?? update.message.chat.id);
-    const allowed = adminIds().has(id);
-    await sendDirectMessage(
-      String(update.message.chat.id),
-      `Ваш Telegram ID: ${id}\n\n${
-        allowed
-          ? "Доступ администратора включён. Теперь подключите этого бота в настройках Telegram Business."
-          : "Добавьте этот ID в TELEGRAM_ADMIN_IDS через запятую и перезапустите бота."
-      }`,
-    );
+  if (update.message && !update.message.business_connection_id) {
+    await handleClientBotMessage(update.message);
   }
+  if (update.channel_post) await handleTelegramChannelPost(update.channel_post);
   if (update.business_message) await handleBusinessMessage(update.business_message);
-  if (update.callback_query) await handleCallback(update.callback_query);
+  if (update.callback_query?.message?.business_connection_id) {
+    await handleCallback(update.callback_query);
+  } else if (update.callback_query) {
+    await handleClientBotCallback(update.callback_query);
+  }
 }
 
 export async function handleTelegramUpdate(update: TelegramUpdate) {
@@ -593,76 +516,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 }
 
 export async function runScheduledTelegramJobs() {
-  const now = new Date();
-  const reminderThreshold = new Date(now.getTime() - 20 * HOUR);
-  const replyWindow = new Date(now.getTime() - 23 * HOUR);
-  const reminderCandidates = await prisma.telegramConversation.findMany({
-    where: {
-      state: "options_sent",
-      stopped: false,
-      reminderSentAt: null,
-      lastIncomingAt: { lte: reminderThreshold, gte: replyWindow },
-      OR: [
-        { clientId: null },
-        { client: { is: { status: { not: "barter" } } } },
-      ],
-    },
-  });
-
-  for (const conversation of reminderCandidates) {
-    await sendBusinessMessage(
-      conversation.businessConnectionId,
-      conversation.telegramChatId,
-      `${conversation.displayName ? `${conversation.displayName}, здравствуйте! ` : "Здравствуйте! "}Вы спрашивали про занятия. Подсказать, какой из свободных вариантов вам лучше подойдёт?`,
-    );
-    await prisma.telegramConversation.update({
-      where: { id: conversation.id },
-      data: { reminderSentAt: now },
-    });
-  }
-
-  const followups = await prisma.telegramConversation.findMany({
-    where: {
-      state: { in: ["awaiting_type", "options_sent"] },
-      stopped: false,
-      followupDueAt: { lte: now },
-      OR: [
-        { clientId: null },
-        { client: { is: { status: { not: "barter" } } } },
-      ],
-    },
-    include: { tasks: { where: { type: "manual_followup" } } },
-  });
-
-  for (const conversation of followups) {
-    if (conversation.tasks.length > 0) continue;
-    const task = await prisma.botTask.create({
-      data: {
-        conversationId: conversation.id,
-        type: "manual_followup",
-        dueAt: conversation.followupDueAt ?? now,
-      },
-    });
-    const link = conversation.username
-      ? `https://t.me/${conversation.username}`
-      : conversation.telegramUserId
-        ? `tg://user?id=${conversation.telegramUserId}`
-        : null;
-    const name = conversation.displayName || conversation.username || "Клиент";
-    const text = `${name} спрашивала расписание 2 дня назад, но запись не завершена.\n\nГотовый текст:\n«${name}, здравствуйте! Вы спрашивали про занятия. Подсказать актуальные свободные даты?»`;
-
-    for (const adminId of adminIds()) {
-      await sendDirectMessage(adminId, text, link ? {
-        inline_keyboard: [[{ text: "Открыть чат", url: link }]],
-      } : undefined);
-    }
-    await prisma.botTask.update({
-      where: { id: task.id },
-      data: { status: "notified", notificationSentAt: new Date() },
-    });
-    await prisma.telegramConversation.update({
-      where: { id: conversation.id },
-      data: { state: "manual_followup", followupDueAt: null },
-    });
-  }
+  // В личных Business-чатах автоматических дожимов больше нет.
+  // Фоновая задача обслуживает только записи в отдельном клиентском боте.
+  await runClientBookingReminders();
 }

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { prisma, usesPostgres } from "@/lib/db";
 import { findClientDuplicates } from "@/lib/queries";
 import {
   currentMoscowWallClockDate,
   derivedSubStatus,
+  formatRussianPhone,
   isUsable,
   remaining,
   TRAINER_PROFIT_DEFAULT,
@@ -23,6 +24,10 @@ function str(fd: FormData, key: string): string {
 function strOrNull(fd: FormData, key: string): string | null {
   const v = str(fd, key);
   return v === "" ? null : v;
+}
+function phoneOrNull(fd: FormData): string | null {
+  const value = formatRussianPhone(str(fd, "phone"));
+  return value || null;
 }
 function num(fd: FormData, key: string, fallback = 0): number {
   const v = Number(fd.get(key));
@@ -71,7 +76,7 @@ function clientValues(fd: FormData): ClientFormValues {
     status: str(fd, "status") || "lead",
     source: str(fd, "source"),
     sourceDetail: str(fd, "sourceDetail"),
-    phone: str(fd, "phone"),
+    phone: formatRussianPhone(str(fd, "phone")),
     telegram: str(fd, "telegram"),
     instagram: str(fd, "instagram"),
     firstContact: str(fd, "firstContact"),
@@ -89,7 +94,7 @@ export async function createClient(
   const fullName = str(fd, "fullName");
   if (!fullName) return null;
 
-  const phone = strOrNull(fd, "phone");
+  const phone = phoneOrNull(fd);
   const telegram = strOrNull(fd, "telegram");
   const instagram = strOrNull(fd, "instagram");
 
@@ -128,7 +133,7 @@ export async function updateClient(fd: FormData) {
     where: { id },
     data: {
       fullName: str(fd, "fullName"),
-      phone: strOrNull(fd, "phone"),
+      phone: phoneOrNull(fd),
       telegram: strOrNull(fd, "telegram"),
       instagram: strOrNull(fd, "instagram"),
       source: strOrNull(fd, "source"),
@@ -506,6 +511,61 @@ export async function deletePriceItem(fd: FormData) {
   revalidatePath("/prices");
 }
 
+// ─────────── Клиентский Telegram-бот ───────────
+export async function updateBotSettings(fd: FormData) {
+  const holdMinutes = Math.max(5, Math.min(180, num(fd, "bookingHoldMinutes", 30)));
+  await prisma.botSettings.upsert({
+    where: { id: 1 },
+    create: {
+      id: 1,
+      enabled: fd.get("enabled") === "on",
+      welcomeText: strOrNull(fd, "welcomeText"),
+      classesText: strOrNull(fd, "classesText"),
+      teacherText: strOrNull(fd, "teacherText"),
+      requiredChannelChatId: strOrNull(fd, "requiredChannelChatId"),
+      requiredChannelUrl: strOrNull(fd, "requiredChannelUrl"),
+      paymentDetails: strOrNull(fd, "paymentDetails"),
+      offlineAddress: strOrNull(fd, "offlineAddress"),
+      onlineMeetingUrl: strOrNull(fd, "onlineMeetingUrl"),
+      trainerText: strOrNull(fd, "trainerText"),
+      bookingHoldMinutes: holdMinutes,
+    },
+    update: {
+      enabled: fd.get("enabled") === "on",
+      welcomeText: strOrNull(fd, "welcomeText"),
+      classesText: strOrNull(fd, "classesText"),
+      teacherText: strOrNull(fd, "teacherText"),
+      requiredChannelChatId: strOrNull(fd, "requiredChannelChatId"),
+      requiredChannelUrl: strOrNull(fd, "requiredChannelUrl"),
+      paymentDetails: strOrNull(fd, "paymentDetails"),
+      offlineAddress: strOrNull(fd, "offlineAddress"),
+      onlineMeetingUrl: strOrNull(fd, "onlineMeetingUrl"),
+      trainerText: strOrNull(fd, "trainerText"),
+      bookingHoldMinutes: holdMinutes,
+    },
+  });
+  revalidatePath("/bot");
+}
+
+export async function updateBotContent(fd: FormData) {
+  const { BOT_CONTENT_DEFINITIONS } = await import("@/lib/bot-content");
+  for (const definition of BOT_CONTENT_DEFINITIONS) {
+    const value = String(fd.get(definition.key) ?? "").trim();
+    if (!value || value === definition.defaultValue) {
+      await prisma.botContent.deleteMany({ where: { key: definition.key } });
+      continue;
+    }
+    await prisma.botContent.upsert({
+      where: { key: definition.key },
+      create: { key: definition.key, value },
+      update: { value },
+    });
+  }
+  const { syncTelegramBotProfile } = await import("@/lib/telegram-channel");
+  await syncTelegramBotProfile().catch(() => undefined);
+  revalidatePath("/bot");
+}
+
 // ─────────── Занятия ───────────
 function lessonCapacity(
   format: "group" | "individual",
@@ -529,6 +589,8 @@ export async function createLesson(fd: FormData) {
       format,
       startsAt,
       capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
+      meetingUrl: strOrNull(fd, "meetingUrl"),
+      location: strOrNull(fd, "location"),
     },
   });
   await autoEnrollGroupSubscribers(lesson.id);
@@ -551,6 +613,8 @@ export async function updateLessonSettings(fd: FormData) {
       type,
       ...(startsAt ? { startsAt } : {}),
       capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
+      meetingUrl: strOrNull(fd, "meetingUrl"),
+      location: strOrNull(fd, "location"),
     },
   });
   await autoEnrollGroupSubscribers(id);
@@ -608,7 +672,6 @@ async function autoEnrollGroupSubscribers(lessonId: number) {
       clientId,
       status: "enrolled",
     })),
-    skipDuplicates: true,
   });
 }
 
@@ -626,7 +689,9 @@ export async function enrollClient(fd: FormData) {
   const clientId = num(fd, "clientId");
   if (!lessonId || !clientId) return;
   const result = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
+    if (usesPostgres) {
+      await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
+    }
     const lesson = await tx.lesson.findUnique({
       where: { id: lessonId },
       include: { attendances: true },

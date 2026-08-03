@@ -23,7 +23,6 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
-  pluralLessons,
   type SubStatus,
   type SubType,
 } from "@/lib/domain";
@@ -67,6 +66,10 @@ export default async function ClientCardPage({
         orderBy: { lesson: { startsAt: "desc" } },
       },
       singleVisits: { orderBy: { date: "desc" } },
+      botBookings: {
+        where: { status: "confirmed", amount: { gt: 0 } },
+        orderBy: { reviewedAt: "desc" },
+      },
       notes: { orderBy: { createdAt: "desc" } },
       goals: { orderBy: { createdAt: "asc" } },
     },
@@ -80,6 +83,7 @@ export default async function ClientCardPage({
   const trainerSpent = client.hasTrainer
     ? (client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)
     : 0;
+  const botSpent = client.botBookings.reduce((sum, booking) => sum + booking.amount, 0);
 
   return (
     <div className="space-y-7">
@@ -93,7 +97,15 @@ export default async function ClientCardPage({
       {/* Шапка */}
       <Card className="p-5">
         <div className="flex items-start gap-4">
-          <Avatar name={client.fullName} size={56} />
+          <Avatar
+            name={client.fullName}
+            size={56}
+            src={
+              client.telegramAvatarFileId
+                ? `/api/telegram/avatar/${client.id}`
+                : null
+            }
+          />
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
               {client.fullName}
@@ -167,7 +179,7 @@ export default async function ClientCardPage({
         />
         <Stat
           label="Сумма покупок"
-          value={formatMoney(spent + singleSpent + trainerSpent)}
+          value={formatMoney(spent + singleSpent + trainerSpent + botSpent)}
         />
         <Stat label="Последнее занятие" value={formatDate(client.lastVisitAt)} />
         <Stat label="Первый контакт" value={formatDate(client.firstContact)} />

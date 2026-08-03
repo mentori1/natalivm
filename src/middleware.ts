@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, isValidSession } from "@/lib/auth";
 
 export async function middleware(req: NextRequest) {
+  if (process.env.LOCAL_AUTH_BYPASS === "1") {
+    return NextResponse.next();
+  }
   // Авторизация включается, только когда задан пароль (APP_PASSWORD).
   // Без него сайт открыт — удобно для демо до настройки входа.
   if (!process.env.APP_PASSWORD) {

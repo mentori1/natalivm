@@ -7,6 +7,8 @@ import {
   remaining,
   pluralLessons,
   effectiveClientStatus,
+  normalizeHandle,
+  normalizePhone,
   type ClientStatus,
 } from "@/lib/domain";
 import { Avatar, Badge, Card, EmptyState, buttonClass } from "@/components/ui";
@@ -31,23 +33,22 @@ export default async function ClientsPage({
 }) {
   const { status = "all", q = "" } = await searchParams;
   const query = q.trim();
-  const handleQuery = query.replace(/^@+/, "");
-
-  const all = await prisma.client.findMany({
-    where: query
-      ? {
-          OR: [
-            { fullName: { contains: query, mode: "insensitive" } },
-            { telegram: { contains: handleQuery, mode: "insensitive" } },
-            { telegramUserId: { equals: handleQuery } },
-            { phone: { contains: query } },
-            { instagram: { contains: handleQuery, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
+  const handleQuery = normalizeHandle(query);
+  const phoneQuery = normalizePhone(query);
+  const allRaw = await prisma.client.findMany({
     include: { subscriptions: true },
     orderBy: [{ fullName: "asc" }],
   });
+  const all = query
+    ? allRaw.filter(
+        (client) =>
+          client.fullName.toLowerCase().includes(query.toLowerCase()) ||
+          normalizeHandle(client.telegram).includes(handleQuery) ||
+          normalizeHandle(client.instagram).includes(handleQuery) ||
+          client.telegramUserId === handleQuery ||
+          (phoneQuery && normalizePhone(client.phone).includes(phoneQuery)),
+      )
+    : allRaw;
   // Статус считаем по абонементам и по нему же фильтруем
   const withStatus = all.map((c) => ({
     ...c,
@@ -159,7 +160,14 @@ export default async function ClientsPage({
                 href={`/clients/${c.id}`}
                 className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-tint"
               >
-                <Avatar name={c.fullName} />
+                <Avatar
+                  name={c.fullName}
+                  src={
+                    c.telegramAvatarFileId
+                      ? `/api/telegram/avatar/${c.id}`
+                      : null
+                  }
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-ink">
                     {c.fullName}

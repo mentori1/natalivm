@@ -176,6 +176,25 @@ export default async function LessonPage({
                   className="mt-1"
                 />
               </label>
+              <label className="min-w-0 text-sm font-medium text-ink">
+                Ссылка на онлайн-занятие
+                <Input
+                  name="meetingUrl"
+                  type="url"
+                  defaultValue={lesson.meetingUrl ?? ""}
+                  placeholder="https://..."
+                  className="mt-1"
+                />
+              </label>
+              <label className="min-w-0 text-sm font-medium text-ink">
+                Адрес офлайн-занятия
+                <Input
+                  name="location"
+                  defaultValue={lesson.location ?? ""}
+                  placeholder="Москва, ..."
+                  className="mt-1"
+                />
+              </label>
               <div className="sm:col-span-2 sm:flex sm:justify-end">
                 <SubmitButton variant="soft" size="md">
                   Сохранить занятие

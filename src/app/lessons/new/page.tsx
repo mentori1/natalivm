@@ -55,6 +55,12 @@ export default function NewLessonPage() {
                 defaultValue={defaultStart()}
               />
             </Field>
+            <Field label="Ссылка на онлайн-занятие">
+              <Input name="meetingUrl" type="url" placeholder="https://..." />
+            </Field>
+            <Field label="Адрес офлайн-занятия">
+              <Input name="location" placeholder="Москва, ..." />
+            </Field>
           </div>
         </Card>
         <div className="flex justify-end">

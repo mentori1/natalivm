@@ -1,7 +1,6 @@
 // Схема БД мини-CRM преподавателя танцев.
-// Прототип на SQLite; при деплое меняется только datasource на Postgres.
-// Статусы хранятся как строки (TEXT) — SQLite не поддерживает enum,
-// плюс это удобнее для бизнес-логики, которая со временем меняется.
+// Рабочая база — PostgreSQL; для изолированного локального теста скрипт
+// создаёт SQLite-копию схемы. Статусы хранятся строками для гибкой бизнес-логики.
 
 generator client {
   provider = "prisma-client"
@@ -19,6 +18,7 @@ model Client {
   phone              String?
   telegram           String?
   telegramUserId     String?   @unique // стабильный Telegram ID для business-бота
+  telegramAvatarFileId String? // Telegram file_id фотографии профиля
   instagram          String?
   birthDate          DateTime?
   firstContact       DateTime  @default(now()) // дата первого контакта
@@ -42,6 +42,7 @@ model Client {
   goals                 ClientGoal[]
   singleVisits          SingleVisit[]
   telegramConversations TelegramConversation[]
+  botBookings           BotBooking[]
 }
 
 /// Разовое или пробное посещение (без абонемента, оплата за визит)
@@ -120,16 +121,19 @@ model SubscriptionVisit {
 
 /// Занятие (одно событие в расписании)
 model Lesson {
-  id        Int      @id @default(autoincrement())
-  title     String? // напр. «Оффлайн группа»
-  type      String // online | offline
-  format    String   @default("group") // group | individual
-  startsAt  DateTime // дата и время начала
-  capacity  Int? // сколько мест
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  title      String? // напр. «Оффлайн группа»
+  type       String // online | offline
+  format     String   @default("group") // group | individual
+  startsAt   DateTime // дата и время начала
+  capacity   Int? // сколько мест
+  meetingUrl String? // ссылка на онлайн-занятие (если отличается от общей)
+  location   String? // адрес офлайн-занятия (если отличается от общего)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   attendances Attendance[]
+  botBookings BotBooking[]
 
   @@index([startsAt])
 }
@@ -246,4 +250,88 @@ model BotTask {
 model TelegramUpdate {
   id          String   @id
   processedAt DateTime @default(now())
+}
+
+/// Настройки клиентского Telegram-бота. Одна запись с id=1.
+model BotSettings {
+  id                    Int      @id @default(1)
+  enabled               Boolean  @default(false)
+  welcomeText           String?
+  welcomePhotoFileId    String? // Telegram file_id приветственного изображения
+  classesText           String?
+  teacherText           String?
+  requiredChannelChatId String? // @username или числовой chat_id канала
+  requiredChannelUrl    String? // ссылка кнопки «Подписаться»
+  paymentDetails        String? // реквизиты, которые видит клиент
+  offlineAddress        String? // общий адрес для напоминаний
+  onlineMeetingUrl      String? // общая ссылка, если у занятия нет своей
+  trainerText           String? // описание тренажёра в клиентском боте
+  trainerVideoFileId    String? // Telegram file_id видео, загруженного администратором
+  bookingPhotoFileId    String? // Telegram file_id обложки записи
+  myLessonsPhotoFileId  String? // Telegram file_id обложки «Мои занятия»
+  trainerPhotoFileId    String? // Telegram file_id обложки тренажёра
+  pricesPhotoFileId     String? // Telegram file_id обложки прайса
+  bookingHoldMinutes    Int      @default(30)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+/// Последний экран клиентского бота в чате — нужен для очистки старых сообщений.
+model BotSession {
+  telegramChatId      String   @id
+  lastScreenMessageId Int?
+  lastScreenMessageIds String? // JSON-массив экранов, если раздел состоит из нескольких сообщений
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Редактируемые тексты и подписи кнопок клиентского Telegram-бота.
+model BotContent {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// Канал, в котором бот опубликовал и закрепил пост со ссылкой на запись.
+/// Нужен также для сохранения источника клиента при переходе по кнопке.
+model BotChannel {
+  telegramChatId String   @id
+  title          String
+  username       String?
+  postMessageId  Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// Заявка на занятие из отдельного Telegram-бота.
+/// Сумма и название тарифа фиксируются при создании и не меняются вместе с прайсом.
+model BotBooking {
+  id                     Int       @id @default(autoincrement())
+  telegramChatId         String
+  telegramUserId         String
+  username               String?
+  displayName            String?
+  clientId               Int?
+  client                 Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  lessonId               Int
+  lesson                 Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  status                 String    @default("awaiting_receipt") // awaiting_receipt | review | confirmed | rejected | expired | cancelled
+  kind                   String // subscription | trial | single
+  tariffName             String?
+  amount                 Int       @default(0)
+  receiptFileId          String?
+  receiptFileName        String?
+  receiptMimeType        String?
+  holdExpiresAt          DateTime
+  reviewedByTelegramId   String?
+  reviewedAt             DateTime?
+  reminder3hSentAt       DateTime?
+  reminder1hSentAt       DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([status, holdExpiresAt])
+  @@index([lessonId, status])
+  @@index([telegramUserId, status])
+  @@index([clientId])
 }

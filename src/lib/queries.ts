@@ -123,6 +123,13 @@ export async function getDashboard() {
     _sum: { amount: true },
     where: { date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
   });
+  const botPaymentsThisMonth = await prisma.botBooking.findMany({
+    where: {
+      status: "confirmed",
+      amount: { gt: 0 },
+      reviewedAt: { gte: startOfMonth(now), lte: endOfMonth(now) },
+    },
+  });
 
   const todayLessons = todayLessonsRaw.map((l) => {
     const enrolled = l.attendances.filter((a) => a.status !== "absent").length;
@@ -158,17 +165,26 @@ export async function getDashboard() {
   const trainerRevenue = clients
     .filter((c) => c.trainerPurchasedAt && inMonth(c.trainerPurchasedAt))
     .reduce((s, c) => s + (c.trainerProfit ?? TRAINER_PROFIT_DEFAULT), 0);
+  const botRevenue = botPaymentsThisMonth.reduce(
+    (sum, booking) => sum + booking.amount,
+    0,
+  );
 
-  const revenueMonth = subsRevenue + singleRevenue + trainerRevenue;
+  const revenueMonth =
+    subsRevenue + singleRevenue + trainerRevenue + botRevenue;
   const expensesMonth = expenses._sum.amount ?? 0;
 
   // Все абонементы для метрик
   const allSubs = clients.flatMap((c) => c.subscriptions);
   const paidSubs = allSubs.filter((s) => s.pricePerLesson > 0);
+  const paidChecks = [
+    ...paidSubs.map((item) => item.totalLessons * item.pricePerLesson),
+    ...botPaymentsThisMonth.map((item) => item.amount),
+  ];
   const avgCheck =
-    paidSubs.length > 0
-      ? paidSubs.reduce((s, x) => s + x.totalLessons * x.pricePerLesson, 0) /
-        paidSubs.length
+    paidChecks.length > 0
+      ? paidChecks.reduce((sum, amount) => sum + amount, 0) /
+        paidChecks.length
       : 0;
 
   const activeClients = clients.filter((c) =>

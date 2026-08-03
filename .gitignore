@@ -46,3 +46,10 @@ next-env.d.ts
 # local database (SQLite)
 *.db
 *.db-journal
+# Локальная изолированная база для тестов бота
+prisma/.local/
+dance-crm-test.db
+dance-crm-test.db-journal
+.local-services.pids
+.local-crm.log
+.local-bot.log

@@ -52,6 +52,13 @@ export const IconTag = (p: P) => (
   </svg>
 );
 
+export const IconBot = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="4" y="7" width="16" height="12" rx="3" />
+    <path d="M12 3v4M9 12h.01M15 12h.01M8 16h8" />
+  </svg>
+);
+
 export const IconChevronRight = (p: P) => (
   <svg {...base} {...p}>
     <path d="M9 6l6 6-6 6" />

@@ -1,8 +1,12 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const databaseUrl = process.env.DATABASE_URL ?? "";
+const adapter = databaseUrl.startsWith("file:")
+  ? new PrismaBetterSqlite3({ url: databaseUrl })
+  : new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -18,6 +22,8 @@ const todayAt = (hour: number, minute = 0) => {
 
 async function main() {
   // Полная очистка ради идемпотентности сидера
+  await prisma.botSession.deleteMany();
+  await prisma.botBooking.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.note.deleteMany();
   await prisma.clientGoal.deleteMany();
@@ -85,7 +91,7 @@ async function main() {
   });
 
   // 3. Мария — была на пробном 14 дней назад, ничего не купила
-  const maria = await prisma.client.create({
+  await prisma.client.create({
     data: {
       fullName: "Мария Иванова",
       phone: "+7 903 777-88-99",

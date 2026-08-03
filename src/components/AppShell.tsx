@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { logout } from "@/lib/auth-actions";
-import { IconHome, IconUsers, IconCalendar, IconWallet, IconTag } from "./icons";
+import { IconHome, IconUsers, IconCalendar, IconWallet, IconTag, IconBot } from "./icons";
 
 const IconLogout = ({ className }: { className?: string }) => (
   <svg
@@ -30,6 +30,7 @@ const NAV = [
   { href: "/lessons", label: "Занятия", Icon: IconCalendar },
   { href: "/prices", label: "Прайс", Icon: IconTag },
   { href: "/finance", label: "Финансы", Icon: IconWallet },
+  { href: "/bot", label: "Бот", Icon: IconBot },
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean) {
@@ -116,15 +117,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          <form action={logout} className="relative z-10 flex min-w-0 flex-1">
-            <button
-              type="submit"
-              className="flex min-w-0 flex-1 touch-manipulation select-none flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium text-muted"
-            >
-              <IconLogout className="size-6" />
-              Выйти
-            </button>
-          </form>
         </div>
       </nav>
     </div>

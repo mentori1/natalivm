@@ -73,6 +73,14 @@ export default async function FinancePage({
   const trainerClients = await prisma.client.findMany({
     where: { trainerPurchasedAt: { gte: mStart, lte: mEnd } },
   });
+  const botPayments = await prisma.botBooking.findMany({
+    where: {
+      status: "confirmed",
+      amount: { gt: 0 },
+      reviewedAt: { gte: mStart, lte: mEnd },
+    },
+    include: { client: true, lesson: true },
+  });
   const expenses = await prisma.expense.findMany({
     where: { date: { gte: mStart, lte: mEnd } },
     orderBy: { date: "desc" },
@@ -102,6 +110,16 @@ export default async function FinancePage({
       desc: `Тренажёр · ${c.trainerPurchasedAt ? formatDate(c.trainerPurchasedAt) : ""}`,
       amount: c.trainerProfit ?? TRAINER_PROFIT_DEFAULT,
       date: c.trainerPurchasedAt ?? sel,
+    })),
+    ...botPayments.map((booking) => ({
+      key: `b${booking.id}`,
+      clientId: booking.clientId,
+      name: booking.client?.fullName || booking.displayName || "Клиент из Telegram",
+      desc: `Оплата через бот · ${booking.tariffName || "занятие"} · ${formatDate(
+        booking.reviewedAt,
+      )}`,
+      amount: booking.amount,
+      date: booking.reviewedAt ?? booking.createdAt,
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -162,7 +180,7 @@ export default async function FinancePage({
             {income.map((i) => (
               <Link
                 key={i.key}
-                href={`/clients/${i.clientId}`}
+                href={i.clientId ? `/clients/${i.clientId}` : "/bot"}
                 className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-brand-tint"
               >
                 <div className="min-w-0">

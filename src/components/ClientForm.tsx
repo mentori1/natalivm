@@ -3,6 +3,7 @@ import { Field, Input, Select, Textarea, SubmitButton } from "@/components/form"
 import { Card, buttonClass } from "@/components/ui";
 import { IconAlert } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { PhoneInput } from "@/components/PhoneInput";
 import {
   CLIENT_STATUS,
   CLIENT_SOURCES,
@@ -105,11 +106,8 @@ export function ClientForm({
       <Card className="space-y-4 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Телефон">
-            <Input
-              name="phone"
-              type="tel"
+            <PhoneInput
               defaultValue={v?.phone ?? client?.phone ?? ""}
-              placeholder="+7 ___ ___-__-__"
             />
           </Field>
           <Field label="Telegram">

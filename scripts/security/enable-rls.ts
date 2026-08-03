@@ -16,6 +16,11 @@ const tables = [
   "TelegramConversation",
   "BotTask",
   "TelegramUpdate",
+  "BotSettings",
+  "BotSession",
+  "BotContent",
+  "BotChannel",
+  "BotBooking",
 ];
 
 async function main() {
