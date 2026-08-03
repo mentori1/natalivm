@@ -16,3 +16,5 @@ PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
 ReadWritePaths=/srv/natalivm/backups
+TimeoutStartSec=20min
+Nice=10
