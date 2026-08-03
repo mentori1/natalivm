@@ -53,3 +53,6 @@ dance-crm-test.db-journal
 .local-services.pids
 .local-crm.log
 .local-bot.log
+
+# SSH-доступ к рабочему серверу: хранится только локально
+/ДОСТУП-К-СЕРВЕРУ/
