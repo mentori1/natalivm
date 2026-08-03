@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily VUMEXCLUSIVE database backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=10m
+Unit=natalivm-backup.service
+
+[Install]
+WantedBy=timers.target

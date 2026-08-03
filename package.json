@@ -12,6 +12,8 @@
     "db:studio": "prisma studio",
     "bot:dev": "tsx scripts/telegram/poll.ts",
     "bot:poll": "TELEGRAM_LOCAL_POLLING=1 tsx scripts/telegram/poll.ts",
+    "db:backup": "tsx scripts/ops/backup-db.ts",
+    "db:verify-backup": "tsx scripts/ops/verify-backup.ts",
     "local:setup": "tsx scripts/local/setup-db.ts",
     "local:prepare": "LOCAL_KEEP_DATA=1 tsx scripts/local/setup-db.ts",
     "local:crm": "tsx scripts/local/run-crm.ts",
