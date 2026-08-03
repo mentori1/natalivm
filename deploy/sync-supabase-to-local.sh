@@ -13,7 +13,7 @@ fi
 app_dir="/srv/natalivm/current"
 source_env="/etc/natalivm/supabase.env"
 local_env="/etc/natalivm/database.env"
-backup_dir="/srv/natalivm/backups/migrations"
+backup_dir="/var/backups/natalivm/migrations"
 pg_bin="/usr/lib/postgresql/17/bin"
 database="natalivm_crm"
 import_database="${database}_import"

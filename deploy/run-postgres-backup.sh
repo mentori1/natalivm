@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-backup_dir="${1:-/srv/natalivm/backups/postgres}"
+backup_dir="${1:-/var/backups/natalivm/postgres}"
 database="${2:-natalivm_crm}"
 pg_bin="${PG_BIN:-/usr/lib/postgresql/17/bin}"
 restore_database="${database}_restore_check"

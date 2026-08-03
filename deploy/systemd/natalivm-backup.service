@@ -15,6 +15,6 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=/srv/natalivm/backups
+ReadWritePaths=/srv/natalivm/backups /var/backups/natalivm
 TimeoutStartSec=20min
 Nice=10
