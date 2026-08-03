@@ -87,7 +87,7 @@ runuser -u postgres -- "$pg_bin/psql" -X -v ON_ERROR_STOP=1 -d "$import_database
 # Сравниваем не только количество, но и содержимое каждой строки.
 total=0
 for table in "${tables[@]}"; do
-  sql="SELECT count(*)::text || ':' || md5(COALESCE(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text), '')) FROM \"$table\" t"
+  sql="SELECT count(*)::text || ':' || md5(COALESCE(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text COLLATE \"C\"), '')) FROM \"$table\" t"
   source_fingerprint="$(PGCONNECT_TIMEOUT=20 PGOPTIONS='-c timezone=UTC' "$pg_bin/psql" -X -A -t "$source_url" -c "$sql")"
   local_fingerprint="$(runuser -u postgres -- env PGOPTIONS='-c timezone=UTC' "$pg_bin/psql" -X -A -t -d "$import_database" -c "$sql")"
   if [[ "$source_fingerprint" != "$local_fingerprint" ]]; then
