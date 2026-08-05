@@ -78,6 +78,7 @@ PostgreSQL подготовлен и проходит проверку пере�
 | `AUTH_SECRET` | подпись сессии | `openssl rand -hex 32` |
 | `TELEGRAM_BOT_TOKEN` | доступ к клиентскому Telegram-боту | BotFather, хранить только в env |
 | `TELEGRAM_ADMIN_IDS` | кто может подтвердить или отклонить чек | числовые Telegram ID через запятую |
+| `TELEGRAM_DROP_PENDING_UPDATES` | удалять ли очередь при запуске polling | `0`; значение `1` только для отдельного тестового бота |
 | `TELEGRAM_WEBHOOK_SECRET` | защита production webhook | `openssl rand -hex 32` |
 
 Локально лежат в `.env` (`DATABASE_URL`) и `.env.local` (`APP_PASSWORD`, `AUTH_SECRET`).

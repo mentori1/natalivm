@@ -20,7 +20,12 @@ async function main() {
     );
   });
   if (process.env.TELEGRAM_LOCAL_POLLING === "1") {
-    await telegramApi<boolean>("deleteWebhook", { drop_pending_updates: true });
+    // В production сохраняем события, пришедшие во время переключения webhook -> polling.
+    // Очистка очереди разрешена только явной переменной для изолированного теста.
+    await telegramApi<boolean>("deleteWebhook", {
+      drop_pending_updates:
+        process.env.TELEGRAM_DROP_PENDING_UPDATES === "1",
+    });
     await telegramApi<boolean>("setMyCommands", {
       commands: [
         { command: "start", description: "Открыть главное меню" },
