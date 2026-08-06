@@ -154,9 +154,15 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(new URL("/", request.url), 303);
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",", 1)[0]
+    .trim();
   response.cookies.set(SESSION_COOKIE, await sessionToken(), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: forwardedProto
+      ? forwardedProto === "https"
+      : request.nextUrl.protocol === "https:",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
