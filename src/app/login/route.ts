@@ -133,10 +133,21 @@ function htmlResponse(html: string, status = 200) {
   });
 }
 
+function publicUrl(request: NextRequest, pathname: string) {
+  const protocol =
+    request.headers.get("x-forwarded-proto")?.split(",", 1)[0].trim() ||
+    request.nextUrl.protocol.replace(":", "");
+  const host =
+    request.headers.get("x-forwarded-host")?.split(",", 1)[0].trim() ||
+    request.headers.get("host") ||
+    request.nextUrl.host;
+  return new URL(pathname, `${protocol}://${host}`);
+}
+
 export async function GET(request: NextRequest) {
   const cookie = request.cookies.get(SESSION_COOKIE)?.value;
   if (await isValidSession(cookie)) {
-    return NextResponse.redirect(new URL("/", request.url), 303);
+    return NextResponse.redirect(publicUrl(request, "/"), 303);
   }
   return htmlResponse(loginPage());
 }
@@ -153,7 +164,7 @@ export async function POST(request: NextRequest) {
     return htmlResponse(loginPage("Неверный пароль"), 401);
   }
 
-  const response = NextResponse.redirect(new URL("/", request.url), 303);
+  const response = NextResponse.redirect(publicUrl(request, "/"), 303);
   const forwardedProto = request.headers
     .get("x-forwarded-proto")
     ?.split(",", 1)[0]
