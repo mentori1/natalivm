@@ -49,6 +49,17 @@ function wallClockDateTimeOrNull(fd: FormData, key: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function wallClockDateTimes(fd: FormData, key: string): Date[] {
+  const unique = new Map<number, Date>();
+  for (const value of fd.getAll(key)) {
+    const raw = String(value).trim();
+    if (!raw) continue;
+    const date = new Date(`${raw}Z`);
+    if (!isNaN(date.getTime())) unique.set(date.getTime(), date);
+  }
+  return [...unique.values()].sort((a, b) => a.getTime() - b.getTime());
+}
+
 function priceKind(fd: FormData): PriceKind {
   const v = str(fd, "kind");
   return v === "subscription" || v === "single" || v === "trial"
@@ -215,26 +226,61 @@ export async function createSubscription(fd: FormData) {
   const format = tariff ? tariff.format : lessonFormat(fd);
   const pricePerLesson = num(fd, "pricePerLesson", tariff?.price ?? 0);
 
-  await prisma.subscription.create({
-    data: {
-      clientId,
-      type,
-      format,
-      tariffName: tariff ? tariff.name : strOrNull(fd, "tariffName"),
-      totalLessons,
-      usedLessons: 0,
-      pricePerLesson,
-      purchasedAt,
-      expiresAt,
-      status: "active",
-    },
-  });
-  // при покупке абонемента клиент становится активным
-  await prisma.client.update({
-    where: { id: clientId },
-    data: { status: "active" },
+  const individualStartsAt =
+    format === "individual"
+      ? wallClockDateTimes(fd, "individualStartsAt").slice(0, totalLessons)
+      : [];
+
+  await prisma.$transaction(async (tx) => {
+    const client = await tx.client.findUnique({
+      where: { id: clientId },
+      select: { fullName: true },
+    });
+    if (!client) return;
+
+    const subscription = await tx.subscription.create({
+      data: {
+        clientId,
+        type,
+        format,
+        tariffName: tariff ? tariff.name : strOrNull(fd, "tariffName"),
+        totalLessons,
+        usedLessons: 0,
+        pricePerLesson,
+        purchasedAt,
+        expiresAt,
+        status: "active",
+      },
+    });
+
+    for (const startsAt of individualStartsAt) {
+      await tx.lesson.create({
+        data: {
+          title: `Индивидуальное · ${client.fullName}`,
+          type,
+          format: "individual",
+          startsAt,
+          capacity: 1,
+          attendances: {
+            create: {
+              clientId,
+              status: "enrolled",
+            },
+          },
+        },
+      });
+    }
+
+    // При покупке абонемента клиент становится активным.
+    await tx.client.update({
+      where: { id: clientId },
+      data: { status: "active" },
+    });
+
+    return subscription;
   });
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/lessons");
   revalidatePath("/");
 }
 
@@ -748,7 +794,11 @@ export async function setAttendance(fd: FormData) {
   if (next === "present") {
     const now = new Date();
     const subs = await prisma.subscription.findMany({
-      where: { clientId: att.clientId, type: att.lesson.type },
+      where: {
+        clientId: att.clientId,
+        type: att.lesson.type,
+        format: att.lesson.format,
+      },
     });
     const usable = subs
       .filter((s) => isUsable(s, now) && remaining(s) > 0)
