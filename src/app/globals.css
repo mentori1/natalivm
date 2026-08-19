@@ -58,6 +58,77 @@
   display: none;
 }
 
+.mobile-nav-lens {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: var(--lens-width);
+  height: var(--lens-height);
+  transform: translate3d(var(--lens-x), var(--lens-y), 0);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 0.875rem;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.58),
+      rgba(255, 255, 255, 0.2) 52%,
+      rgba(248, 233, 238, 0.38)
+    );
+  box-shadow:
+    0 10px 24px rgba(104, 51, 70, 0.13),
+    0 2px 6px rgba(44, 34, 40, 0.06),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.96),
+    inset 1px 0 1px rgba(255, 255, 255, 0.72),
+    inset 0 -1px 1px rgba(143, 58, 86, 0.12);
+  backdrop-filter: blur(14px) saturate(1.65) contrast(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.65) contrast(1.04);
+  will-change: transform, width, height;
+  transition:
+    transform 560ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 520ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 420ms cubic-bezier(0.34, 1.35, 0.64, 1),
+    opacity 160ms ease;
+}
+
+.mobile-nav-lens::before,
+.mobile-nav-lens::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.mobile-nav-lens::before {
+  inset: 1px;
+  border-radius: calc(0.875rem - 2px);
+  background:
+    radial-gradient(
+      circle at 24% 5%,
+      rgba(255, 255, 255, 0.92),
+      rgba(255, 255, 255, 0) 38%
+    ),
+    linear-gradient(
+      112deg,
+      rgba(255, 255, 255, 0.2),
+      transparent 46%,
+      rgba(177, 74, 107, 0.08)
+    );
+  opacity: 0.82;
+}
+
+.mobile-nav-lens::after {
+  top: 4px;
+  left: 18%;
+  width: 42%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  opacity: 0.88;
+}
+
 .studio-pulse {
   position: relative;
   isolation: isolate;
@@ -186,6 +257,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mobile-nav-lens {
+    transition-duration: 1ms !important;
+  }
+
   .studio-pulse,
   .studio-pulse *,
   .studio-signal::before,

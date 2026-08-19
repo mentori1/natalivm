@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/cn";
 import { logout } from "@/lib/auth-actions";
 import { IconHome, IconUsers, IconCalendar, IconWallet, IconTag, IconBot } from "./icons";
@@ -38,8 +44,68 @@ function isActive(pathname: string, href: string, exact?: boolean) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+function mobileActiveIndex(pathname: string) {
+  const index = NAV.findIndex(({ href, exact }) =>
+    isActive(pathname, href, exact),
+  );
+  if (index >= 0) return index;
+  if (pathname.startsWith("/subscriptions/")) {
+    return NAV.findIndex(({ href }) => href === "/clients");
+  }
+  return 0;
+}
+
+type LensPosition = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  ready: boolean;
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const mobileLinkRefs = useRef<Array<HTMLAnchorElement | null>>([]);
+  const [lens, setLens] = useState<LensPosition>({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    ready: false,
+  });
+  const activeMobileIndex = mobileActiveIndex(pathname);
+
+  useLayoutEffect(() => {
+    const nav = mobileNavRef.current;
+    const activeLink = mobileLinkRefs.current[activeMobileIndex];
+    if (!nav || !activeLink) return;
+
+    const updateLens = () => {
+      const content = activeLink.querySelector<HTMLElement>("[data-nav-content]");
+      if (!content) return;
+
+      const contentWidth = content.getBoundingClientRect().width;
+      const width = Math.min(
+        activeLink.offsetWidth - 6,
+        Math.max(48, contentWidth + 18),
+      );
+
+      setLens({
+        x: activeLink.offsetLeft + (activeLink.offsetWidth - width) / 2,
+        y: activeLink.offsetTop,
+        width,
+        height: activeLink.offsetHeight,
+        ready: true,
+      });
+    };
+
+    updateLens();
+    const observer = new ResizeObserver(updateLens);
+    observer.observe(nav);
+    observer.observe(activeLink);
+    return () => observer.disconnect();
+  }, [activeMobileIndex]);
 
   // Страница входа — без меню и оболочки
   if (pathname === "/login") {
@@ -98,22 +164,48 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav
         aria-label="Основная навигация"
         data-testid="mobile-nav"
-        className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] isolate border-t border-line bg-surface [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
+        className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] isolate border-t border-white/70 bg-surface/75 shadow-[0_-10px_30px_rgba(44,34,40,0.06)] backdrop-blur-xl [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
       >
-        <div className="relative z-10 mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          {NAV.map(({ href, label, Icon, exact }) => {
-            const active = isActive(pathname, href, exact);
+        <div
+          ref={mobileNavRef}
+          className="relative z-10 mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        >
+          <span
+            aria-hidden="true"
+            className="mobile-nav-lens"
+            style={
+              {
+                "--lens-x": `${lens.x}px`,
+                "--lens-y": `${lens.y}px`,
+                "--lens-width": `${lens.width}px`,
+                "--lens-height": `${lens.height}px`,
+                opacity: lens.ready ? 1 : 0,
+              } as CSSProperties
+            }
+          />
+          {NAV.map(({ href, label, Icon }, index) => {
             return (
               <Link
                 key={href}
                 href={href}
+                ref={(node) => {
+                  mobileLinkRefs.current[index] = node;
+                }}
+                aria-current={
+                  index === activeMobileIndex ? "page" : undefined
+                }
                 className={cn(
-                  "relative z-10 flex min-w-0 flex-1 touch-manipulation select-none flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors",
-                  active ? "text-brand" : "text-muted",
+                  "relative z-10 flex min-w-0 flex-1 touch-manipulation select-none items-center justify-center rounded-xl py-1.5 text-[11px] font-medium transition-colors duration-300 focus:outline-none focus-visible:text-ink",
+                  index === activeMobileIndex ? "text-brand-dark" : "text-muted",
                 )}
               >
-                <Icon className="size-6" />
-                {label}
+                <span
+                  data-nav-content
+                  className="flex min-w-0 flex-col items-center gap-1"
+                >
+                  <Icon className="size-6" />
+                  <span>{label}</span>
+                </span>
               </Link>
             );
           })}
