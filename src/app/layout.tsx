@@ -12,6 +12,25 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "VUMEXCLUSIVE · CRM",
   description: "Мини-CRM преподавателя танцев: клиенты, абонементы, занятия",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "VUMEXCLUSIVE",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
