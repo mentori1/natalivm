@@ -171,11 +171,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav
         aria-label="Основная навигация"
         data-testid="mobile-nav"
-        className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] isolate border-t border-line/80 bg-surface/75 shadow-[0_-10px_30px_rgba(44,34,40,0.06)] backdrop-blur-xl [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[100] isolate px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
       >
         <div
           ref={mobileNavRef}
-          className="relative z-10 mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+          className="mobile-nav-dock pointer-events-auto relative z-10 mx-auto flex max-w-md items-stretch justify-around rounded-[1.65rem] border border-line/70 px-1.5 py-1.5"
         >
           <span
             aria-hidden="true"
