@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { buttonClass } from "@/components/ui";
 
 export const inputClass =
-  "w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/50 focus:border-brand focus:ring-2 focus:ring-brand/15";
+  "w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/50 focus:border-brand focus:ring-2 focus:ring-brand/15";
 
 export function Field({
   label,
@@ -49,7 +49,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={cn(inputClass, "appearance-none bg-white pr-9", props.className)}
+      className={cn(inputClass, "appearance-none bg-surface pr-9", props.className)}
     />
   );
 }

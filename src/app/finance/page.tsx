@@ -137,7 +137,7 @@ export default async function FinancePage({
         <div className="mt-3 flex items-center gap-2">
           <Link
             href={`/finance?m=${monthKey(prevDate)}`}
-            className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-black/5"
+            className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-brand-soft/70"
             aria-label="Прошлый месяц"
           >
             ‹
@@ -148,7 +148,7 @@ export default async function FinancePage({
           {canNext ? (
             <Link
               href={`/finance?m=${monthKey(nextDate)}`}
-              className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-black/5"
+              className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-brand-soft/70"
               aria-label="Следующий месяц"
             >
               ›

@@ -200,14 +200,14 @@ function Segmented({
   active: string;
 }) {
   return (
-    <div className="inline-flex w-fit rounded-full border border-line bg-white p-1">
+    <div className="inline-flex w-fit rounded-full border border-line bg-surface p-1">
       {items.map((item) => (
         <Link
           key={item.key}
           href={item.href}
           className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
             item.key === active
-              ? "bg-brand text-white"
+              ? "bg-brand text-brand-contrast"
               : "text-muted hover:bg-brand-tint hover:text-ink"
           }`}
         >
@@ -290,7 +290,7 @@ function CalendarView({
                   d: key,
                 })}
                 className={`min-h-16 border-r border-b border-line p-2 transition-colors hover:bg-brand-tint ${
-                  selected ? "bg-brand-tint ring-2 ring-inset ring-brand/30" : "bg-white"
+                  selected ? "bg-brand-tint ring-2 ring-inset ring-brand/30" : "bg-surface"
                 } ${inMonth ? "" : "opacity-35"}`}
               >
                 <span className="text-sm font-semibold text-ink">{day.getDate()}</span>

@@ -95,8 +95,8 @@ export default async function SourcesPage({
               href={`/sources?period=${p.key}`}
               className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 active
-                  ? "bg-brand text-white"
-                  : "bg-white text-ink/70 ring-1 ring-line hover:bg-brand-tint"
+                  ? "bg-brand text-brand-contrast"
+                  : "bg-surface text-ink/70 ring-1 ring-line hover:bg-brand-tint"
               }`}
             >
               {p.label}

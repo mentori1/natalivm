@@ -199,7 +199,7 @@ export default async function BotPage() {
               <details
                 key={group.key}
                 open={groupIndex === 0}
-                className="rounded-lg border border-line bg-white"
+                className="rounded-lg border border-line bg-surface"
               >
                 <summary className="cursor-pointer px-5 py-4 font-semibold text-ink">
                   {group.label}

@@ -103,7 +103,7 @@ function PriceRow({ item }: { item: PriceItem }) {
           Изменить
         </span>
       </summary>
-      <div className="border-t border-line bg-white/70 p-4">
+      <div className="border-t border-line bg-surface/70 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink">Редактирование</p>
           <ConfirmActionForm
@@ -221,7 +221,7 @@ function PriceForm({
         />
       </Field>
       <div className="flex flex-wrap items-end gap-2 md:col-span-2 lg:col-span-3">
-        <label className="flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm text-ink">
+        <label className="flex h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm text-ink">
           <input
             name="active"
             type="checkbox"

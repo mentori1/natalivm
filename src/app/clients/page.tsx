@@ -94,7 +94,7 @@ export default async function ClientsPage({
           name="q"
           defaultValue={query}
           placeholder="Имя, телефон или @username…"
-          className="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none transition placeholder:text-muted/50 focus:border-brand focus:ring-2 focus:ring-brand/15"
+          className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-ink outline-none transition placeholder:text-muted/50 focus:border-brand focus:ring-2 focus:ring-brand/15"
         />
       </form>
 
@@ -109,14 +109,14 @@ export default async function ClientsPage({
               href={item.key === "all" ? "/clients" : `/clients?status=${item.key}`}
               className={`rounded-2xl border p-3 transition-colors ${
                 active
-                  ? "border-brand bg-brand text-white"
-                  : "border-line bg-white hover:bg-brand-tint"
+                  ? "border-brand bg-brand text-brand-contrast"
+                  : "border-line bg-surface hover:bg-brand-tint"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span
                   className={`text-xs font-semibold uppercase ${
-                    active ? "text-white/80" : "text-muted"
+                    active ? "text-brand-contrast/80" : "text-muted"
                   }`}
                 >
                   {item.label}
@@ -124,7 +124,7 @@ export default async function ClientsPage({
                 {meta && (
                   <span
                     className={`size-2 rounded-full ${
-                      active ? "bg-white/80" : "bg-brand/60"
+                      active ? "bg-brand-contrast/80" : "bg-brand/60"
                     }`}
                   />
                 )}
@@ -132,7 +132,7 @@ export default async function ClientsPage({
               <p className="mt-1 text-2xl font-bold leading-none">
                 {counts[item.key]}
               </p>
-              <p className={`mt-1 text-xs ${active ? "text-white/75" : "text-muted"}`}>
+              <p className={`mt-1 text-xs ${active ? "text-brand-contrast/75" : "text-muted"}`}>
                 {item.hint}
               </p>
             </Link>

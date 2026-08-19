@@ -1,26 +1,44 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ── Дизайн-токены (Tailwind v4, CSS-first) ── */
 @theme {
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 
-  /* Брендовая палитра — тёплый рубин/роза (студия, тело, женственность) */
-  --color-brand: #b14a6b;
-  --color-brand-dark: #8f3a56;
-  --color-brand-soft: #f8e9ee;
-  --color-brand-tint: #fdf6f8;
+  /* Burgundy + Blush Pink */
+  --color-brand: #1a0a0f;
+  --color-brand-dark: #3a1822;
+  --color-brand-contrast: #f6e6ea;
+  --color-brand-soft: #edd3da;
+  --color-brand-tint: #faf0f3;
 
   /* Нейтральные */
-  --color-ink: #2c2228;
-  --color-muted: #8a7d83;
-  --color-canvas: #faf6f3;
-  --color-surface: #ffffff;
-  --color-line: #efe6e2;
+  --color-ink: #1a0a0f;
+  --color-muted: #735c64;
+  --color-canvas: #f6e6ea;
+  --color-surface: #fff9fb;
+  --color-line: #e2c5cd;
 }
 
 :root {
   --background: var(--color-canvas);
   --foreground: var(--color-ink);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --color-brand: #f6e6ea;
+  --color-brand-dark: #e3c7ce;
+  --color-brand-contrast: #1a0a0f;
+  --color-brand-soft: #3b2028;
+  --color-brand-tint: #2c151c;
+  --color-ink: #f6e6ea;
+  --color-muted: #c6aab2;
+  --color-canvas: #1a0a0f;
+  --color-surface: #28141a;
+  --color-line: #4a2a33;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -30,6 +48,14 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    transition:
+      background-color 240ms ease,
+      color 240ms ease;
+  }
+
+  ::selection {
+    background: var(--color-brand-soft);
+    color: var(--color-ink);
   }
 
   /* Поля ввода по умолчанию — единый аккуратный вид */
@@ -48,6 +74,12 @@
   box-shadow:
     0 1px 2px rgba(44, 34, 40, 0.04),
     0 8px 24px -16px rgba(44, 34, 40, 0.18);
+}
+
+:root[data-theme="dark"] .card {
+  box-shadow:
+    0 1px 1px rgba(246, 230, 234, 0.03),
+    0 14px 30px -22px rgba(0, 0, 0, 0.72);
 }
 
 /* Тонкая полоса-скролл прятать на мобиле для горизонтальных лент */
@@ -91,6 +123,55 @@
     width 520ms cubic-bezier(0.34, 1.56, 0.64, 1),
     height 420ms cubic-bezier(0.34, 1.35, 0.64, 1),
     opacity 160ms ease;
+}
+
+:root[data-theme="dark"] .mobile-nav-lens {
+  border-color: rgba(246, 230, 234, 0.28);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(246, 230, 234, 0.2),
+      rgba(246, 230, 234, 0.06) 52%,
+      rgba(111, 58, 73, 0.18)
+    );
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.28),
+    0 2px 7px rgba(0, 0, 0, 0.18),
+    inset 0 1.5px 1px rgba(246, 230, 234, 0.3),
+    inset 1px 0 1px rgba(246, 230, 234, 0.16),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .mobile-nav-lens::before {
+  opacity: 0.48;
+}
+
+:root[data-theme="dark"] .mobile-nav-lens::after {
+  background: rgba(246, 230, 234, 0.58);
+  box-shadow: 0 0 8px rgba(246, 230, 234, 0.24);
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.theme-toggle-icon {
+  display: flex;
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.theme-toggle-icon-dark,
+:root[data-theme="dark"] .theme-toggle-icon-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle-icon-dark {
+  display: flex;
+}
+
+.theme-toggle:active .theme-toggle-icon {
+  transform: rotate(18deg) scale(0.9);
 }
 
 .mobile-nav-lens::before,
@@ -138,6 +219,22 @@
   animation: studio-enter 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+:root[data-theme="dark"] .studio-pulse {
+  background:
+    linear-gradient(135deg, rgba(40, 20, 26, 0.98), rgba(31, 13, 19, 0.96)),
+    linear-gradient(120deg, rgba(246, 230, 234, 0.08), transparent);
+}
+
+:root[data-theme="dark"] .studio-pulse::before {
+  background:
+    linear-gradient(90deg, transparent, rgba(246, 230, 234, 0.08), transparent),
+    repeating-linear-gradient(
+      115deg,
+      rgba(246, 230, 234, 0.05) 0 1px,
+      transparent 1px 26px
+    );
+}
+
 .studio-pulse::before {
   content: "";
   position: absolute;
@@ -180,6 +277,11 @@
   border: 1px solid rgba(177, 74, 107, 0.2);
   border-radius: 999px;
   animation: studio-ring 2.6s ease-out infinite;
+}
+
+:root[data-theme="dark"] .studio-signal::before,
+:root[data-theme="dark"] .studio-signal::after {
+  border-color: rgba(246, 230, 234, 0.14);
 }
 
 .studio-signal::after {
@@ -259,6 +361,10 @@
 @media (prefers-reduced-motion: reduce) {
   .mobile-nav-lens {
     transition-duration: 1ms !important;
+  }
+
+  .theme-toggle-icon {
+    transition: none !important;
   }
 
   .studio-pulse,

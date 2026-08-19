@@ -171,14 +171,14 @@ export function ClientForm({
       </Card>
 
       {duplicates.length > 0 && (
-        <Card className="space-y-3 border border-amber-300 bg-amber-50 p-5">
-          <div className="flex items-center gap-2 text-amber-800">
+        <Card className="space-y-3 border border-amber-300 bg-amber-50 p-5 dark:border-amber-700/50 dark:bg-amber-950/40">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
             <IconAlert className="size-5 shrink-0" />
             <p className="font-semibold">
               Возможно, эта клиентка уже есть
             </p>
           </div>
-          <p className="text-sm text-amber-900/80">
+          <p className="text-sm text-amber-900/80 dark:text-amber-200/80">
             Контакты совпадают с теми, кто уже заведён. Проверьте — это тот же
             человек?
           </p>
@@ -187,7 +187,7 @@ export function ClientForm({
               <Link
                 key={d.id}
                 href={`/clients/${d.id}`}
-                className="flex items-center justify-between gap-3 rounded-xl bg-white px-3.5 py-2.5 ring-1 ring-amber-200 transition hover:ring-amber-400"
+                className="flex items-center justify-between gap-3 rounded-xl bg-surface px-3.5 py-2.5 ring-1 ring-amber-200 transition hover:ring-amber-400 dark:ring-amber-700/50"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">{d.fullName}</p>
@@ -211,7 +211,7 @@ export function ClientForm({
               value="1"
               className={cn(
                 buttonClass("ghost", "sm"),
-                "bg-white ring-1 ring-amber-400 text-amber-900 hover:bg-amber-100",
+                "bg-surface text-amber-900 ring-1 ring-amber-400 hover:bg-amber-100 dark:text-amber-200 dark:ring-amber-600 dark:hover:bg-amber-950/60",
               )}
             >
               Всё равно создать новую

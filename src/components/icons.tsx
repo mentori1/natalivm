@@ -59,6 +59,19 @@ export const IconBot = (p: P) => (
   </svg>
 );
 
+export const IconMoon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M20 15.2A8.3 8.3 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z" />
+  </svg>
+);
+
+export const IconSun = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="3.5" />
+    <path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" />
+  </svg>
+);
+
 export const IconChevronRight = (p: P) => (
   <svg {...base} {...p}>
     <path d="M9 6l6 6-6 6" />

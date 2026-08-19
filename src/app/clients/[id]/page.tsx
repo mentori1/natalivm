@@ -341,7 +341,9 @@ export default async function ClientCardPage({
         <SectionTitle>Тренажёр</SectionTitle>
         <Card
           className={`p-5 ${
-            client.hasTrainer ? "border-green-200 bg-green-50/50" : ""
+            client.hasTrainer
+              ? "border-green-200 bg-green-50/50 dark:border-green-800/60 dark:bg-green-950/30"
+              : ""
           }`}
         >
           {client.hasTrainer ? (
@@ -447,8 +449,8 @@ export default async function ClientCardPage({
       {client.recommendations && (
         <section>
           <SectionTitle>Рекомендации для преподавателя</SectionTitle>
-          <Card className="flex items-start gap-3 border-amber-200 bg-amber-50/60 p-5">
-            <IconShield className="mt-0.5 size-5 shrink-0 text-amber-500" />
+          <Card className="flex items-start gap-3 border-amber-200 bg-amber-50/60 p-5 dark:border-amber-800/60 dark:bg-amber-950/30">
+            <IconShield className="mt-0.5 size-5 shrink-0 text-amber-500 dark:text-amber-300" />
             <p className="text-ink">{client.recommendations}</p>
           </Card>
         </section>

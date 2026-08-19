@@ -202,7 +202,7 @@ function StudioPulse({
         </div>
 
         <div className="studio-signal mx-auto flex size-44 items-center justify-center sm:size-52">
-          <div className="studio-signal-core flex size-24 flex-col items-center justify-center rounded-full bg-white text-center shadow-sm sm:size-28">
+          <div className="studio-signal-core flex size-24 flex-col items-center justify-center rounded-full bg-surface text-center shadow-sm sm:size-28">
             <IconSparkle className="size-6 text-brand" />
             <span className="mt-1 text-xs font-semibold text-brand-dark">
               Пульс
@@ -235,14 +235,14 @@ function WeatherLine({
 }) {
   if (!weather) {
     return (
-      <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm text-muted shadow-sm backdrop-blur">
+      <div className="mt-4 rounded-2xl border border-line/70 bg-surface/70 px-4 py-3 text-sm text-muted shadow-sm backdrop-blur">
         Хорошего дня и спокойных занятий.
       </div>
     );
   }
 
   return (
-    <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur">
+    <div className="mt-4 rounded-2xl border border-line/70 bg-surface/70 px-4 py-3 shadow-sm backdrop-blur">
       <p className="text-xs font-semibold uppercase tracking-wide text-brand-dark">
         Москва · {weather.temp}° · ветер {weather.wind} км/ч
       </p>
@@ -257,7 +257,7 @@ function WeatherLine({
 
 function PulseMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="studio-pulse-metric rounded-2xl border border-white/70 bg-white/78 px-4 py-3 shadow-sm backdrop-blur">
+    <div className="studio-pulse-metric rounded-2xl border border-line/70 bg-surface/78 px-4 py-3 shadow-sm backdrop-blur">
       <p className="text-xs font-medium text-muted">{label}</p>
       <p className="mt-1 text-xl font-bold tracking-tight text-ink">{value}</p>
     </div>

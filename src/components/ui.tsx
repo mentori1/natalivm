@@ -5,12 +5,16 @@ import { type Tone } from "@/lib/domain";
 export { Avatar } from "@/components/Avatar";
 
 const TONE: Record<Tone, string> = {
-  green: "bg-green-50 text-green-700 ring-green-600/15",
-  amber: "bg-amber-50 text-amber-700 ring-amber-600/15",
-  red: "bg-red-50 text-red-600 ring-red-600/15",
-  slate: "bg-slate-100 text-slate-600 ring-slate-500/15",
-  violet: "bg-violet-50 text-violet-700 ring-violet-600/15",
-  blue: "bg-sky-50 text-sky-700 ring-sky-600/15",
+  green:
+    "bg-green-50 text-green-700 ring-green-600/15 dark:bg-green-950/45 dark:text-green-300 dark:ring-green-400/20",
+  amber:
+    "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-950/45 dark:text-amber-300 dark:ring-amber-400/20",
+  red: "bg-red-50 text-red-600 ring-red-600/15 dark:bg-red-950/45 dark:text-red-300 dark:ring-red-400/20",
+  slate:
+    "bg-slate-100 text-slate-600 ring-slate-500/15 dark:bg-white/10 dark:text-brand-dark dark:ring-white/15",
+  violet:
+    "bg-violet-50 text-violet-700 ring-violet-600/15 dark:bg-violet-950/45 dark:text-violet-300 dark:ring-violet-400/20",
+  blue: "bg-sky-50 text-sky-700 ring-sky-600/15 dark:bg-sky-950/45 dark:text-sky-300 dark:ring-sky-400/20",
 };
 
 export function Badge({
@@ -113,9 +117,9 @@ export function buttonClass(
   };
   const variants = {
     primary:
-      "bg-brand text-white hover:bg-brand-dark shadow-sm active:scale-[0.99]",
+      "bg-brand text-brand-contrast hover:bg-brand-dark shadow-sm active:scale-[0.99]",
     soft: "bg-brand-soft text-brand-dark hover:bg-brand-soft/70",
-    ghost: "text-ink hover:bg-black/5",
+    ghost: "text-ink hover:bg-brand-soft/70",
   };
   return cn(
     "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none",

@@ -42,7 +42,7 @@ export function VisitCalendar({
         <button
           type="button"
           onClick={prev}
-          className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-black/5"
+          className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-brand-soft/70"
           aria-label="Прошлый месяц"
         >
           ‹
@@ -53,7 +53,7 @@ export function VisitCalendar({
         <button
           type="button"
           onClick={next}
-          className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-black/5"
+          className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-brand-soft/70"
           aria-label="Следующий месяц"
         >
           ›
@@ -93,7 +93,7 @@ export function VisitCalendar({
               className={cn(
                 "flex aspect-square items-center justify-center rounded-lg text-sm transition-colors",
                 active
-                  ? "bg-brand font-semibold text-white"
+                  ? "bg-brand font-semibold text-brand-contrast"
                   : "text-ink hover:bg-brand-tint",
                 isToday && !active && "ring-1 ring-brand/40",
               )}

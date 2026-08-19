@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#b14a6b",
+  themeColor: "#F6E6EA",
   width: "device-width",
   initialScale: 1,
 };
@@ -26,7 +26,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className={`${manrope.variable} h-full antialiased`}>
+    <html
+      lang="ru"
+      suppressHydrationWarning
+      className={`${manrope.variable} h-full antialiased`}
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('vumexclusive-theme')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==='dark'?'#1A0A0F':'#F6E6EA'}catch(e){document.documentElement.dataset.theme='light'}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full">
         <AppShell>{children}</AppShell>
       </body>

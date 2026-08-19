@@ -206,7 +206,7 @@ export default async function LessonPage({
       </Card>
 
       {query.error === "full" && (
-        <Card className="border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+        <Card className="border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-300">
           Записать не получилось: на занятии уже заняты все места.
         </Card>
       )}
@@ -302,7 +302,7 @@ export default async function LessonPage({
                     <button
                       type="submit"
                       aria-label="Убрать из занятия"
-                      className="flex size-7 items-center justify-center rounded-full text-muted/40 hover:bg-black/5 hover:text-muted"
+                      className="flex size-7 items-center justify-center rounded-full text-muted/40 hover:bg-brand-soft/70 hover:text-muted"
                     >
                       <IconX className="size-4" />
                     </button>
@@ -313,7 +313,7 @@ export default async function LessonPage({
           </Card>
         )}
         {!canEnroll && (
-          <p className="mt-3 px-1 text-sm font-medium text-amber-700">
+          <p className="mt-3 px-1 text-sm font-medium text-amber-700 dark:text-amber-300">
             Запись закрыта: заняты все {lesson.capacity} мест.
           </p>
         )}
@@ -353,10 +353,10 @@ function StatusButton({
           isPresent
             ? active
               ? "bg-green-500 text-white"
-              : "bg-green-50 text-green-700 hover:bg-green-100"
+              : "bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-950/45 dark:text-green-300 dark:hover:bg-green-900/50"
             : active
               ? "bg-red-500 text-white"
-              : "bg-red-50 text-red-600 hover:bg-red-100",
+              : "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/50",
         )}
       >
         {isPresent ? (

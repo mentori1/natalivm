@@ -11,6 +11,7 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 import { logout } from "@/lib/auth-actions";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { IconHome, IconUsers, IconCalendar, IconWallet, IconTag, IconBot } from "./icons";
 
 const IconLogout = ({ className }: { className?: string }) => (
@@ -116,7 +117,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-[100dvh]">
       {/* Боковое меню — десктоп */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-surface/80 px-4 py-6 backdrop-blur md:flex">
-        <Brand />
+        <div className="flex items-center justify-between gap-3">
+          <Brand />
+          <ThemeToggle />
+        </div>
         <nav className="mt-8 flex flex-col gap-1">
           {NAV.map(({ href, label, Icon, exact }) => {
             const active = isActive(pathname, href, exact);
@@ -128,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
                   active
                     ? "bg-brand-soft text-brand-dark"
-                    : "text-ink/70 hover:bg-black/5 hover:text-ink",
+                    : "text-ink/70 hover:bg-brand-soft/70 hover:text-ink",
                 )}
               >
                 <Icon className={cn("size-5", active && "text-brand")} />
@@ -141,7 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <form action={logout}>
             <button
               type="submit"
-              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:bg-black/5 hover:text-ink"
+              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:bg-brand-soft/70 hover:text-ink"
             >
               <IconLogout className="size-5" />
               Выйти
@@ -156,6 +160,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Контент */}
       <div className="md:pl-64">
         <main className="mx-auto w-full max-w-3xl px-4 pt-6 pb-28 sm:px-6 md:pb-12 lg:max-w-4xl">
+          <div className="mb-2 flex justify-end md:hidden">
+            <ThemeToggle />
+          </div>
           {children}
         </main>
       </div>
@@ -164,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav
         aria-label="Основная навигация"
         data-testid="mobile-nav"
-        className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] isolate border-t border-white/70 bg-surface/75 shadow-[0_-10px_30px_rgba(44,34,40,0.06)] backdrop-blur-xl [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
+        className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] isolate border-t border-line/80 bg-surface/75 shadow-[0_-10px_30px_rgba(44,34,40,0.06)] backdrop-blur-xl [transform:translateZ(0)] [touch-action:manipulation] md:hidden"
       >
         <div
           ref={mobileNavRef}
@@ -218,7 +225,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-3 px-1.5">
-      <span className="flex size-10 items-center justify-center rounded-2xl bg-brand text-lg font-bold text-white">
+      <span className="flex size-10 items-center justify-center rounded-2xl bg-brand text-lg font-bold text-brand-contrast">
         V
       </span>
       <span className="leading-tight">
