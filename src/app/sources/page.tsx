@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Card, SectionTitle, EmptyState } from "@/components/ui";
 import { IconArrowLeft, IconUsers, IconSparkle } from "@/components/icons";
+import { normalizeSourceDetail } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function SourcesPage({
     if (conv) s.converted++;
     bySource.set(src, s);
 
-    const detail = c.sourceDetail?.trim();
+    const detail = normalizeSourceDetail(c.sourceDetail);
     if (detail) {
       const d = byDetail.get(detail) ?? { count: 0, converted: 0, source: src };
       d.count++;

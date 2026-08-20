@@ -212,6 +212,24 @@ export const CLIENT_SOURCES = [
   "Другое",
 ];
 
+const SOURCE_DETAIL_ALIASES = new Map<string, string>([
+  ["от анюты", "Анюта Солнечная"],
+  ["анюта солнечная", "Анюта Солнечная"],
+  ["от анечки", "Анюта Солнечная"],
+  ["солнечная анюта", "Анюта Солнечная"],
+  ["от ани", "Анюта Солнечная"],
+  ["от анюты солнечной", "Анюта Солнечная"],
+]);
+
+/** Объединяет известные варианты имени одного источника лидов. */
+export function normalizeSourceDetail(
+  value: string | null | undefined,
+): string {
+  const cleaned = (value ?? "").trim().replace(/\s+/g, " ");
+  if (!cleaned) return "";
+  return SOURCE_DETAIL_ALIASES.get(cleaned.toLocaleLowerCase("ru-RU")) ?? cleaned;
+}
+
 // ───────────────────────── защита от дублей клиентов ─────────────────────────
 
 /** Телефон → последние 10 цифр: +7, 8, скобки и пробелы не мешают сравнению. */
