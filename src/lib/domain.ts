@@ -257,9 +257,20 @@ export function formatRussianPhone(v: string | null | undefined): string {
   return result;
 }
 
-/** Юзернейм (Telegram/Instagram) → без «@», в нижнем регистре. */
+/** Юзернейм (Telegram/Instagram) → без ссылки и «@», в нижнем регистре. */
 export function normalizeHandle(v: string | null | undefined): string {
-  return (v ?? "").trim().replace(/^@+/, "").toLowerCase();
+  return (v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^(?:www\.)?(?:t\.me|telegram\.me|instagram\.com)\//, "")
+    .replace(/^@+/, "")
+    .split(/[/?#\s]/, 1)[0];
+}
+
+/** Текст для нечувствительного к регистру поиска по имени. */
+export function normalizeSearchText(v: string | null | undefined): string {
+  return (v ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
 }
 
 /** Найденный возможный дубль клиента (для предупреждения в форме). */

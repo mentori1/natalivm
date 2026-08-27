@@ -9,10 +9,12 @@ import {
   effectiveClientStatus,
   normalizeHandle,
   normalizePhone,
+  normalizeSearchText,
   type ClientStatus,
 } from "@/lib/domain";
 import { Avatar, Badge, Card, EmptyState, buttonClass } from "@/components/ui";
 import { IconChevronRight, IconPlus, IconUsers } from "@/components/icons";
+import { ClientsSearch } from "@/components/ClientsSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default async function ClientsPage({
 }) {
   const { status = "all", q = "" } = await searchParams;
   const query = q.trim();
+  const textQuery = normalizeSearchText(query);
   const handleQuery = normalizeHandle(query);
   const phoneQuery = normalizePhone(query);
   const allRaw = await prisma.client.findMany({
@@ -42,9 +45,9 @@ export default async function ClientsPage({
   const all = query
     ? allRaw.filter(
         (client) =>
-          client.fullName.toLowerCase().includes(query.toLowerCase()) ||
-          normalizeHandle(client.telegram).includes(handleQuery) ||
-          normalizeHandle(client.instagram).includes(handleQuery) ||
+          normalizeSearchText(client.fullName).includes(textQuery) ||
+          (Boolean(handleQuery) && normalizeHandle(client.telegram).includes(handleQuery)) ||
+          (Boolean(handleQuery) && normalizeHandle(client.instagram).includes(handleQuery)) ||
           client.telegramUserId === handleQuery ||
           (phoneQuery && normalizePhone(client.phone).includes(phoneQuery)),
       )
@@ -87,16 +90,7 @@ export default async function ClientsPage({
       </header>
 
       {/* Поиск */}
-      <form method="get" className="relative">
-        {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <input
-          type="search"
-          name="q"
-          defaultValue={query}
-          placeholder="Имя, телефон или @username…"
-          className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-ink outline-none transition placeholder:text-muted/50 focus:border-brand focus:ring-2 focus:ring-brand/15"
-        />
-      </form>
+      <ClientsSearch key={query} initialQuery={query} />
 
       {/* Счётчики по статусам */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
