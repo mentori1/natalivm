@@ -25,6 +25,6 @@ export async function middleware(req: NextRequest) {
 // Всё остальное защищаем паролем кабинета.
 export const config = {
   matcher: [
-    "/((?!login|api/telegram/webhook|_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!login|miniapp|api/miniapp|api/telegram/webhook|_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

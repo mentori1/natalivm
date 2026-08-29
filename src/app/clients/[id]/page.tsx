@@ -33,6 +33,7 @@ import { SubscriptionForm } from "@/components/SubscriptionForm";
 import { SingleVisitForm } from "@/components/SingleVisitForm";
 import { DeleteClientButton } from "@/components/DeleteClientButton";
 import { ConfirmActionForm } from "@/components/ConfirmActionForm";
+import { PortalLinkCard } from "@/components/PortalLinkCard";
 import {
   IconArrowLeft,
   IconPhone,
@@ -167,6 +168,10 @@ export default async function ClientCardPage({
             )}
           </div>
         )}
+      </Card>
+
+      <Card className="p-5">
+        <PortalLinkCard clientId={client.id} />
       </Card>
 
       {/* Статистика */}

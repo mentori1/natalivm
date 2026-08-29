@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [activeMobileIndex]);
 
   // Страница входа — без меню и оболочки
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname.startsWith("/miniapp")) {
     return <>{children}</>;
   }
 

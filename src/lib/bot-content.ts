@@ -344,11 +344,11 @@ export const BOT_CONTENT_DEFINITIONS = [
       "Платёж пока не подтверждён. Проверьте чек и отправьте корректный PDF или фотографию ещё раз.",
   },
   {
-    key: "reminder3h",
+    key: "reminder2h",
     group: "reminders",
-    label: "Напоминание за 3 часа",
+    label: "Напоминание за 2 часа",
     defaultValue:
-      "Напоминаю: через 3 часа занятие — {{date}}, {{format}}.",
+      "Напоминаю: через 2 часа занятие — {{date}}, {{format}}.",
     hint: "{{date}}, {{format}}",
   },
   {

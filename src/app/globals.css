@@ -21,6 +21,55 @@
   --color-line: #e2c5cd;
 }
 
+/* Telegram Mini App: отдельный мобильный кабинет клиентки. */
+.miniapp-shell {
+  --mini-bg: #f6e6ea;
+  --mini-surface: #fff9fb;
+  --mini-ink: #1a0a0f;
+  --mini-accent: #8f2947;
+  background: var(--mini-bg);
+  color: var(--mini-ink);
+  font-family: var(--font-manrope), sans-serif;
+}
+.miniapp-avatar { display:grid; width:52px; height:52px; flex:0 0 auto; place-items:center; overflow:hidden; border:1px solid rgba(26,10,15,.13); border-radius:50%; background:var(--mini-surface); font-weight:800; }
+.miniapp-avatar img { width:100%; height:100%; object-fit:cover; }
+.miniapp-hero { border-radius:22px; background:var(--mini-ink); color:var(--mini-bg); padding:24px; box-shadow:0 16px 36px rgba(26,10,15,.14); }
+.miniapp-hero-button { border:1px solid rgba(246,230,234,.4); border-radius:14px; padding:11px 15px; font-size:14px; font-weight:700; }
+.miniapp-kicker { color:var(--mini-accent); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.miniapp-title { margin-top:3px; font-size:24px; font-weight:800; }
+.miniapp-link { color:var(--mini-accent); font-size:13px; font-weight:700; }
+.miniapp-empty, .miniapp-row, .miniapp-price, .miniapp-subscription, .miniapp-profile { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); }
+.miniapp-empty { padding:22px; color:rgba(26,10,15,.58); font-size:14px; text-align:center; }
+.miniapp-row { display:flex; align-items:center; gap:14px; padding:16px; }
+.miniapp-price, .miniapp-subscription { padding:18px; }
+.miniapp-profile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px; }
+.miniapp-type { display:inline-flex; border-radius:999px; background:rgba(143,41,71,.1); color:var(--mini-accent); padding:4px 8px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.miniapp-primary, .miniapp-small-button { border-radius:14px; background:var(--mini-ink); color:var(--mini-bg); font-weight:750; transition:transform .16s ease, opacity .16s ease; }
+.miniapp-primary { min-height:50px; padding:13px 18px; }
+.miniapp-small-button { min-height:40px; flex:0 0 auto; padding:9px 13px; font-size:13px; }
+.miniapp-primary:active, .miniapp-small-button:active { transform:scale(.97); }
+.miniapp-primary:disabled, .miniapp-small-button:disabled { opacity:.45; }
+.miniapp-segment { display:flex; gap:4px; border:1px solid rgba(26,10,15,.11); border-radius:16px; background:rgba(255,249,251,.65); padding:4px; }
+.miniapp-segment button { min-width:0; flex:1; border-radius:12px; padding:10px 8px; color:rgba(26,10,15,.58); font-size:13px; font-weight:700; }
+.miniapp-segment button.active { background:var(--mini-ink); color:var(--mini-bg); }
+.miniapp-stepper { display:flex; align-items:center; overflow:hidden; border:1px solid rgba(26,10,15,.14); border-radius:12px; }
+.miniapp-stepper button, .miniapp-stepper span { display:grid; width:34px; height:38px; place-items:center; }
+.miniapp-stepper button { font-size:20px; }
+.miniapp-stepper span { font-size:14px; font-weight:800; }
+.miniapp-day { aspect-ratio:1; border:1px solid rgba(26,10,15,.13); border-radius:12px; background:var(--mini-surface); font-size:11px; font-weight:750; }
+.miniapp-day.active { background:var(--mini-ink); color:var(--mini-bg); }
+.miniapp-progress { height:6px; overflow:hidden; border-radius:999px; background:rgba(26,10,15,.1); }
+.miniapp-progress span { display:block; height:100%; border-radius:inherit; background:var(--mini-accent); }
+.miniapp-alert { border-radius:14px; background:#e9f7ef; color:#225d3c; padding:12px 14px; font-size:13px; font-weight:650; }
+.miniapp-alert.is-error { background:#fff0f0; color:#9b2525; }
+.miniapp-nav { position:fixed; z-index:80; right:14px; bottom:max(12px,env(safe-area-inset-bottom)); left:14px; display:flex; max-width:480px; margin:0 auto; border:1px solid rgba(26,10,15,.13); border-radius:24px; background:rgba(255,249,251,.88); padding:6px; box-shadow:0 14px 36px rgba(26,10,15,.16); backdrop-filter:blur(20px); }
+.miniapp-nav button { display:flex; min-width:0; flex:1; flex-direction:column; align-items:center; gap:2px; border-radius:18px; padding:7px 3px; color:rgba(26,10,15,.52); }
+.miniapp-nav button > span { font-size:22px; line-height:1; }
+.miniapp-nav button small { font-size:10px; font-weight:700; }
+.miniapp-nav button.active { background:var(--mini-ink); color:var(--mini-bg); }
+.miniapp-loader { width:34px; height:34px; border:3px solid rgba(26,10,15,.12); border-top-color:var(--mini-ink); border-radius:50%; animation:miniapp-spin .8s linear infinite; }
+@keyframes miniapp-spin { to { transform:rotate(360deg); } }
+
 :root {
   --background: var(--color-canvas);
   --foreground: var(--color-ink);

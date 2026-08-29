@@ -43,6 +43,35 @@ model Client {
   singleVisits          SingleVisit[]
   telegramConversations TelegramConversation[]
   botBookings           BotBooking[]
+  portalPreference      ClientPortalPreference?
+  portalLinks           ClientPortalLink[]
+  subscriptionOrders    SubscriptionOrder[]
+}
+
+/// Предпочтения клиентки в личном кабинете Mini App.
+model ClientPortalPreference {
+  id                Int      @id @default(autoincrement())
+  clientId          Int      @unique
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  preferredType     String? // online | offline | both
+  preferredWeekdays String? // JSON-массив номеров дней недели 1..7
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// Одноразовая ссылка для точной привязки Telegram к существующей карточке.
+/// В базе хранится только хеш токена, сам токен показывается один раз.
+model ClientPortalLink {
+  id                     Int       @id @default(autoincrement())
+  clientId               Int
+  client                 Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash              String    @unique
+  expiresAt              DateTime
+  usedAt                 DateTime?
+  usedByTelegramUserId   String?
+  createdAt              DateTime  @default(now())
+
+  @@index([clientId, expiresAt])
 }
 
 /// Разовое или пробное посещение (без абонемента, оплата за визит)
@@ -103,7 +132,38 @@ model PriceItem {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  subscriptionOrders SubscriptionOrder[]
+
   @@index([kind, type])
+}
+
+/// Заявка на покупку или продление абонемента из Mini App.
+/// Название тарифа, цена и число занятий фиксируются в момент заявки.
+model SubscriptionOrder {
+  id                   Int        @id @default(autoincrement())
+  clientId             Int
+  client               Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  priceItemId          Int?
+  priceItem            PriceItem? @relation(fields: [priceItemId], references: [id], onDelete: SetNull)
+  telegramChatId       String
+  telegramUserId       String
+  type                 String // online | offline
+  format               String     @default("group")
+  tariffName           String
+  totalLessons         Int
+  pricePerLesson       Int
+  amount               Int
+  status               String     @default("awaiting_receipt") // awaiting_receipt | review | confirmed | rejected | cancelled
+  receiptFileId        String?
+  receiptFileName      String?
+  receiptMimeType      String?
+  reviewedByTelegramId String?
+  reviewedAt           DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([clientId, status])
+  @@index([telegramUserId, status])
 }
 
 /// Отмеченный день посещения по абонементу (ручная отметка в календаре,
@@ -327,6 +387,7 @@ model BotBooking {
   reviewedAt             DateTime?
   reminder3hSentAt       DateTime?
   reminder1hSentAt       DateTime?
+  trialFollowupSentAt    DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
