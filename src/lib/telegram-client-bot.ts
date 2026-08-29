@@ -135,6 +135,7 @@ async function replaceWelcomeScreen(
   chatId: string,
   caption: string,
   photoFileId: string | null,
+  replyMarkup: Record<string, unknown> = mainMenu(),
 ) {
   await clearPreviousScreen(chatId);
 
@@ -143,13 +144,13 @@ async function replaceWelcomeScreen(
         chat_id: chatId,
         photo: photoFileId,
         caption,
-        reply_markup: mainMenu(),
+        reply_markup: replyMarkup,
       })
     : await sendTelegramPhotoFile(
         chatId,
         join(process.cwd(), "public", "bot-welcome.png"),
         caption,
-        mainMenu(),
+        replyMarkup,
       );
 
   const uploadedPhotoFileId = message.photo?.at(-1)?.file_id;
@@ -246,7 +247,7 @@ async function editCallbackButtons(query: TelegramCallbackQuery) {
   }).catch(() => undefined);
 }
 
-async function sendWelcome(chatId: string) {
+async function sendWelcome(chatId: string, userId?: string) {
   const settings = await getBotSettings();
   if (!settings.enabled) {
     await replaceScreen(
@@ -257,12 +258,47 @@ async function sendWelcome(chatId: string) {
     );
     return;
   }
+  const copy = await getBotCopy();
+  const miniAppUrl = process.env.MINIAPP_URL?.trim();
+  if (miniAppUrl) {
+    await telegramApi<boolean>("setChatMenuButton", {
+      chat_id: chatId,
+      menu_button: {
+        type: "web_app",
+        text: "Личный кабинет",
+        web_app: { url: miniAppUrl },
+      },
+    }).catch(() => undefined);
+  }
+
+  const subscribed =
+    !userId ||
+    telegramAdminIds().has(userId) ||
+    (await hasRequiredSubscription(userId));
+  const rows: { text: string; url?: string; callback_data?: string; web_app?: { url: string } }[][] = [];
+  if (!subscribed) {
+    const url = channelUrl(
+      settings.requiredChannelChatId,
+      settings.requiredChannelUrl,
+    );
+    if (url) rows.push([{ text: copy.text("buttonSubscribe"), url }]);
+    rows.push([
+      {
+        text: copy.text("buttonCheckSubscription"),
+        callback_data: "client:check",
+      },
+    ]);
+  } else if (miniAppUrl) {
+    rows.push([{ text: "Личный кабинет", web_app: { url: miniAppUrl } }]);
+  }
   const text = settings.welcomeText || "Добро пожаловать в VUMEXCLUSIVE.";
+  const welcomeMarkup = rows.length ? { inline_keyboard: rows } : mainMenu();
   await replaceWelcomeScreen(
     chatId,
     text,
     settings.welcomePhotoFileId,
-  ).catch(() => replaceScreen(chatId, text));
+    welcomeMarkup,
+  ).catch(() => replaceScreen(chatId, text, welcomeMarkup));
 }
 
 function channelUrl(chatId: string | null, configuredUrl: string | null) {
@@ -299,9 +335,6 @@ async function askForSubscription(chatId: string) {
       text: copy.text("buttonCheckSubscription"),
       callback_data: "client:check",
     },
-  ]);
-  rows.push([
-    { text: copy.text("buttonMenu"), callback_data: "client:menu" },
   ]);
   await replaceScreen(
     chatId,
@@ -1193,7 +1226,7 @@ export async function handleClientBotMessage(message: TelegramMessage) {
     }
     await clearRecentChat(chatId, message.message_id);
     await deleteMessage(chatId, message.message_id);
-    await sendWelcome(chatId);
+    await sendWelcome(chatId, message.from ? String(message.from.id) : undefined);
     return;
   }
   if (text === copy.text("buttonBook").trim().toLowerCase()) {
@@ -1237,12 +1270,12 @@ export async function handleClientBotCallback(query: TelegramCallbackQuery) {
 
   if (data === "client:menu") {
     await answerCallback(query.id);
-    await sendWelcome(chatId);
+    await sendWelcome(chatId, userId);
     return;
   }
   if (data === "client:classes" || data === "client:teacher") {
     await answerCallback(query.id);
-    await sendWelcome(chatId);
+    await sendWelcome(chatId, userId);
     return;
   }
   if (data === "client:check") {
@@ -1253,7 +1286,7 @@ export async function handleClientBotCallback(query: TelegramCallbackQuery) {
       !subscribed,
     );
     if (subscribed) {
-      await showBookingTypeMenu(chatId, copy.text("subscriptionConfirmed"));
+      await sendWelcome(chatId, userId);
     } else {
       await askForSubscription(chatId);
     }
