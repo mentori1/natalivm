@@ -37,15 +37,8 @@ const BOT_PHOTO_PATHS = {
 } as const;
 type BotPhotoField = keyof typeof BOT_PHOTO_PATHS;
 
-function mainMenu(copy: BotCopy) {
-  const miniAppUrl = process.env.MINIAPP_URL?.trim();
-  if (!miniAppUrl) return { remove_keyboard: true };
-  return {
-    keyboard: [[{ text: "Личный кабинет", web_app: { url: miniAppUrl } }]],
-    resize_keyboard: true,
-    is_persistent: true,
-    input_field_placeholder: copy.text("inputPlaceholder"),
-  };
+function mainMenu(_copy: BotCopy) {
+  return { remove_keyboard: true };
 }
 
 function typeMenu(copy: BotCopy) {
