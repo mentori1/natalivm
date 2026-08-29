@@ -40,10 +40,14 @@
 .miniapp-kicker { color:var(--mini-accent); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 .miniapp-title { margin-top:3px; font-size:24px; font-weight:800; }
 .miniapp-link { color:var(--mini-accent); font-size:13px; font-weight:700; }
-.miniapp-empty, .miniapp-row, .miniapp-price, .miniapp-subscription, .miniapp-profile { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); }
+.miniapp-empty, .miniapp-row, .miniapp-price, .miniapp-subscription, .miniapp-profile, .miniapp-planned-card, .miniapp-individual-plan { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); }
 .miniapp-empty { padding:22px; color:rgba(26,10,15,.58); font-size:14px; text-align:center; }
 .miniapp-row { display:flex; align-items:center; gap:14px; padding:16px; }
 .miniapp-price, .miniapp-subscription { padding:18px; }
+.miniapp-planned-card, .miniapp-individual-plan { padding:17px; }
+.miniapp-reschedule-box { border:1px solid rgba(26,10,15,.09); border-radius:14px; background:rgba(246,230,234,.48); padding:12px; }
+.miniapp-reschedule-box label { display:block; margin-bottom:7px; color:rgba(26,10,15,.58); font-size:11px; font-weight:800; text-transform:uppercase; }
+.miniapp-reschedule-box input, .miniapp-reschedule-box select, .miniapp-individual-plan input { width:100%; min-height:44px; border:1px solid rgba(26,10,15,.14); border-radius:11px; background:var(--mini-surface); padding:9px 11px; color:var(--mini-ink); font-size:13px; font-weight:650; }
 .miniapp-profile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px; }
 .miniapp-trainer-photo { aspect-ratio:4/3; overflow:hidden; border:1px solid rgba(26,10,15,.11); border-radius:20px; background:var(--mini-surface); }
 .miniapp-trainer-photo img { width:100%; height:100%; object-fit:cover; }

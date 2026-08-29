@@ -18,6 +18,12 @@ import { createBooking } from "@/lib/telegram-client-bot";
 import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import {
+  cancelIndividualLesson,
+  rescheduleIndividualLesson,
+  scheduleIndividualLesson,
+  transferGroupLesson,
+} from "@/lib/portal-schedule";
+import {
   bindClientWithPortalToken,
   syncTelegramClient,
 } from "@/lib/telegram-client-sync";
@@ -78,7 +84,7 @@ export async function GET(req: NextRequest) {
       include: {
         attendances: {
           where: { status: { not: "absent" } },
-          select: { id: true },
+          select: { id: true, clientId: true, enrollmentSource: true },
         },
         botBookings: {
           where: {
@@ -90,6 +96,17 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { startsAt: "asc" },
       take: 40,
+    });
+    const scheduledAttendances = await prisma.attendance.findMany({
+      where: {
+        clientId: client.id,
+        status: "enrolled",
+        enrollmentSource: { not: "auto" },
+        lesson: { startsAt: { gte: now } },
+      },
+      include: { lesson: true },
+      orderBy: { lesson: { startsAt: "asc" } },
+      take: 100,
     });
     const bookings = await prisma.botBooking.findMany({
       where: {
@@ -233,10 +250,18 @@ export async function GET(req: NextRequest) {
         expiresAt: item.expiresAt.toISOString(),
         status: derivedSubStatus(item),
         frozen: item.frozen,
+        scheduledLessons: scheduledAttendances.filter(
+          (attendance) => attendance.plannedSubscriptionId === item.id,
+        ).length,
       })),
       lessons: lessons
         .map((lesson) => {
-          const occupied = lesson.attendances.length + lesson.botBookings.length;
+          const occupied =
+            lesson.attendances.filter(
+              (attendance) =>
+                attendance.clientId !== client.id ||
+                attendance.enrollmentSource !== "auto",
+            ).length + lesson.botBookings.length;
           const free = lesson.capacity ? Math.max(0, lesson.capacity - occupied) : null;
           return {
             id: lesson.id,
@@ -248,6 +273,18 @@ export async function GET(req: NextRequest) {
           };
         })
         .filter((lesson) => lesson.available),
+      scheduledLessons: scheduledAttendances.map((attendance) => ({
+        attendanceId: attendance.id,
+        lessonId: attendance.lessonId,
+        startsAt: attendance.lesson.startsAt.toISOString(),
+        type: attendance.lesson.type,
+        format: attendance.lesson.format,
+        title: attendance.lesson.title ||
+          (attendance.lesson.format === "individual"
+            ? "Индивидуальное занятие"
+            : "Групповое занятие"),
+        plannedSubscriptionId: attendance.plannedSubscriptionId,
+      })),
       bookings: bookings.map((item) => ({
         id: item.id,
         lessonId: item.lessonId,
@@ -266,7 +303,7 @@ export async function GET(req: NextRequest) {
         format: item.format,
         price: item.price,
         minLessons: item.minLessons || 4,
-        purchasable: item.kind === "subscription" && item.format === "group",
+        purchasable: item.kind === "subscription",
       })),
       preferences: {
         preferredType: fullClient.portalPreference?.preferredType || "both",
@@ -304,7 +341,65 @@ export async function POST(req: NextRequest) {
       paymentKind?: "booking" | "subscription";
       paymentId?: number;
       decision?: "approve" | "reject";
+      attendanceId?: number;
+      targetLessonId?: number;
+      subscriptionId?: number;
+      startsAt?: string;
     };
+
+    if (body.action === "scheduleIndividual") {
+      const subscriptionId = Number(body.subscriptionId);
+      const startsAt = new Date(`${String(body.startsAt || "")}Z`);
+      if (!Number.isInteger(subscriptionId) || subscriptionId < 1) {
+        throw new Error("Абонемент не выбран");
+      }
+      await scheduleIndividualLesson(client.id, subscriptionId, startsAt);
+      return NextResponse.json({ ok: true, message: "Занятие добавлено в расписание" });
+    }
+
+    if (body.action === "cancelIndividual") {
+      const attendanceId = Number(body.attendanceId);
+      if (!Number.isInteger(attendanceId) || attendanceId < 1) {
+        throw new Error("Занятие не найдено");
+      }
+      const result = await cancelIndividualLesson(client.id, attendanceId);
+      return NextResponse.json({
+        ok: true,
+        message: result.late
+          ? "Занятие отменено и списано, потому что осталось меньше 30 минут"
+          : "Занятие отменено без списания",
+      });
+    }
+
+    if (body.action === "rescheduleIndividual") {
+      const attendanceId = Number(body.attendanceId);
+      const startsAt = new Date(`${String(body.startsAt || "")}Z`);
+      if (!Number.isInteger(attendanceId) || attendanceId < 1) {
+        throw new Error("Занятие не найдено");
+      }
+      const result = await rescheduleIndividualLesson(client.id, attendanceId, startsAt);
+      return NextResponse.json({
+        ok: true,
+        message: result.late
+          ? "Новая дата сохранена, прежнее занятие списано по правилу 30 минут"
+          : "Занятие перенесено без списания",
+      });
+    }
+
+    if (body.action === "transferGroup") {
+      const attendanceId = Number(body.attendanceId);
+      const targetLessonId = Number(body.targetLessonId);
+      if (
+        !Number.isInteger(attendanceId) ||
+        attendanceId < 1 ||
+        !Number.isInteger(targetLessonId) ||
+        targetLessonId < 1
+      ) {
+        throw new Error("Выберите занятие для переноса");
+      }
+      await transferGroupLesson(client.id, attendanceId, targetLessonId);
+      return NextResponse.json({ ok: true, message: "Запись перенесена без списания" });
+    }
 
     if (body.action === "reviewPayment") {
       const adminId = String(user.id);
@@ -425,7 +520,6 @@ export async function POST(req: NextRequest) {
           id: Number(body.priceItemId),
           active: true,
           kind: "subscription",
-          format: "group",
         },
       });
       if (!priceItem) throw new Error("Тариф больше недоступен");

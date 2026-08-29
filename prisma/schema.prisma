@@ -111,8 +111,9 @@ model Subscription {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  attendances Attendance[]
-  visits      SubscriptionVisit[]
+  attendances        Attendance[] @relation("ConsumedSubscription")
+  plannedAttendances Attendance[] @relation("PlannedSubscription")
+  visits             SubscriptionVisit[]
 
   @@index([clientId])
 }
@@ -201,20 +202,24 @@ model Lesson {
 /// Запись клиента на занятие + факт посещения.
 /// status: enrolled (записан) | present (была) | absent (не была)
 model Attendance {
-  id             Int           @id @default(autoincrement())
-  lessonId       Int
-  lesson         Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  clientId       Int
-  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  status         String        @default("enrolled")
-  subscriptionId Int? // с какого абонемента списали занятие
-  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                    Int           @id @default(autoincrement())
+  lessonId              Int
+  lesson                Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  clientId              Int
+  client                Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status                String        @default("enrolled")
+  enrollmentSource      String        @default("crm") // crm | auto | bot | portal | individual
+  subscriptionId        Int? // с какого абонемента уже списали занятие
+  subscription          Subscription? @relation("ConsumedSubscription", fields: [subscriptionId], references: [id])
+  plannedSubscriptionId Int? // по какому абонементу запланировано индивидуальное занятие
+  plannedSubscription   Subscription? @relation("PlannedSubscription", fields: [plannedSubscriptionId], references: [id], onDelete: SetNull)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@unique([lessonId, clientId])
   @@index([clientId])
   @@index([lessonId])
+  @@index([plannedSubscriptionId])
 }
 
 /// Журнал заметок преподавателя по клиенту

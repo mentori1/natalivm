@@ -64,8 +64,9 @@ export async function approveBookingPayment(
         lessonId: booking.lessonId,
         clientId: booking.clientId,
         status: "enrolled",
+        enrollmentSource: "bot",
       },
-      update: { status: "enrolled" },
+      update: { status: "enrolled", enrollmentSource: "bot" },
     });
     await tx.botBooking.update({
       where: { id: bookingId },

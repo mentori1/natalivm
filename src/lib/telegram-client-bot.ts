@@ -663,11 +663,13 @@ export async function createBooking(
     });
     const existingAttendance = await tx.attendance.findUnique({
       where: { lessonId_clientId: { lessonId, clientId: client.id } },
-      select: { status: true },
+      select: { status: true, enrollmentSource: true },
     });
     if (
       existingConfirmed ||
-      (existingAttendance && existingAttendance.status !== "absent")
+      (existingAttendance &&
+        existingAttendance.status !== "absent" &&
+        existingAttendance.enrollmentSource !== "auto")
     ) {
       return { ok: true as const, alreadyBooked: true as const };
     }
@@ -709,8 +711,16 @@ export async function createBooking(
     if (quote.amount === 0) {
       await tx.attendance.upsert({
         where: { lessonId_clientId: { lessonId, clientId: client.id } },
-        create: { lessonId, clientId: client.id, status: "enrolled" },
-        update: { status: "enrolled" },
+        create: {
+          lessonId,
+          clientId: client.id,
+          status: "enrolled",
+          enrollmentSource: options?.notifyChat === false ? "portal" : "bot",
+        },
+        update: {
+          status: "enrolled",
+          enrollmentSource: options?.notifyChat === false ? "portal" : "bot",
+        },
       });
     }
     const booking = await tx.botBooking.create({

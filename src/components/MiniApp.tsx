@@ -32,6 +32,7 @@ type PortalData = {
     expiresAt: string;
     status: string;
     frozen: boolean;
+    scheduledLessons: number;
   }>;
   lessons: Array<{
     id: number;
@@ -49,6 +50,15 @@ type PortalData = {
     startsAt: string;
     type: LessonType;
     title: string;
+  }>;
+  scheduledLessons: Array<{
+    attendanceId: number;
+    lessonId: number;
+    startsAt: string;
+    type: LessonType;
+    format: "group" | "individual";
+    title: string;
+    plannedSubscriptionId: number | null;
   }>;
   prices: Array<{
     id: number;
@@ -122,6 +132,40 @@ function formatDate(value: string, withTime = false) {
   }).format(new Date(value));
 }
 
+function formatScheduleDate(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function dateTimeInput(value?: string) {
+  if (value) return new Date(value).toISOString().slice(0, 16);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((item) => item.type === type)?.value || 0);
+  const date = new Date(Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+  ));
+  date.setUTCMinutes(Math.ceil(date.getUTCMinutes() / 30) * 30, 0, 0);
+  return date.toISOString().slice(0, 16);
+}
+
 function money(value: number) {
   return `${value.toLocaleString("ru-RU")} ₽`;
 }
@@ -152,6 +196,10 @@ export function MiniApp() {
   const [lessonCounts, setLessonCounts] = useState<Record<number, number>>({});
   const [uploadingPayment, setUploadingPayment] = useState("");
   const [adminFilter, setAdminFilter] = useState<"review" | "confirmed" | "rejected">("review");
+  const [individualDates, setIndividualDates] = useState<Record<number, string>>({});
+  const [editDates, setEditDates] = useState<Record<number, string>>({});
+  const [editingLesson, setEditingLesson] = useState<number | null>(null);
+  const [transferTargets, setTransferTargets] = useState<Record<number, number>>({});
   const [receiptPreview, setReceiptPreview] = useState<{
     url: string;
     mimeType: string;
@@ -174,6 +222,14 @@ export function MiniApp() {
       setLessonCounts(
         Object.fromEntries(result.prices.map((price) => [price.id, price.minLessons])),
       );
+      setIndividualDates((old) => ({
+        ...Object.fromEntries(
+          result.subscriptions
+            .filter((subscription) => subscription.format === "individual")
+            .map((subscription) => [subscription.id, dateTimeInput()]),
+        ),
+        ...old,
+      }));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Не удалось открыть кабинет");
     } finally {
@@ -289,8 +345,19 @@ export function MiniApp() {
     () => data?.lessons.filter((lesson) => lesson.type === type) || [],
     [data, type],
   );
-  const nextBooking = data?.bookings.find((booking) => booking.status === "confirmed");
-  const bookedLessonIds = new Set(data?.bookings.map((booking) => booking.lessonId) || []);
+  const nextBooking = data?.scheduledLessons[0] ||
+    data?.bookings.find((booking) => booking.status === "confirmed");
+  const bookedLessonIds = new Set([
+    ...(data?.bookings.map((booking) => booking.lessonId) || []),
+    ...(data?.scheduledLessons.map((lesson) => lesson.lessonId) || []),
+  ]);
+  const individualSubscriptions = data?.subscriptions.filter(
+    (subscription) =>
+      subscription.format === "individual" &&
+      ["active", "ending"].includes(subscription.status) &&
+      !subscription.frozen &&
+      subscription.remaining > 0,
+  ) || [];
   const payablePayments = data?.payments.filter((payment) =>
     ["awaiting_receipt", "rejected"].includes(payment.status),
   ) || [];
@@ -364,7 +431,7 @@ export function MiniApp() {
                 <p className="text-xs font-semibold uppercase opacity-60">Ближайшее занятие</p>
                 {nextBooking ? (
                   <>
-                    <p className="mt-3 text-3xl font-bold">{formatDate(nextBooking.startsAt, true)}</p>
+                    <p className="mt-3 text-3xl font-bold">{formatScheduleDate(nextBooking.startsAt)}</p>
                     <p className="mt-1 opacity-75">
                       {nextBooking.type === "online" ? "Онлайн" : "Офлайн"} · {nextBooking.title}
                     </p>
@@ -429,7 +496,199 @@ export function MiniApp() {
         {tab === "schedule" && (
           <section>
             <p className="miniapp-kicker">Расписание</p>
-            <h2 className="miniapp-title">Выберите занятие</h2>
+            <h2 className="miniapp-title">Мои занятия</h2>
+
+            <div className="mt-4 space-y-3">
+              {data.scheduledLessons.length ? data.scheduledLessons.map((lesson) => {
+                const targets = data.lessons.filter(
+                  (candidate) =>
+                    lesson.format === "group" &&
+                    candidate.type === lesson.type &&
+                    candidate.id !== lesson.lessonId,
+                );
+                const selectedTarget = transferTargets[lesson.attendanceId] || targets[0]?.id;
+                return (
+                  <article key={lesson.attendanceId} className="miniapp-planned-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="miniapp-type">
+                            {lesson.type === "online" ? "Онлайн" : "Офлайн"}
+                          </span>
+                          <span className="miniapp-type is-muted">
+                            {lesson.format === "individual" ? "Индивидуально" : "Группа"}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-lg font-bold">{formatScheduleDate(lesson.startsAt)}</p>
+                        <p className="mt-1 text-sm opacity-55">{lesson.title}</p>
+                      </div>
+                    </div>
+
+                    {lesson.format === "individual" && lesson.plannedSubscriptionId && (
+                      <div className="mt-4">
+                        {editingLesson === lesson.attendanceId ? (
+                          <div className="miniapp-reschedule-box">
+                            <input
+                              type="datetime-local"
+                              value={editDates[lesson.attendanceId] || dateTimeInput(lesson.startsAt)}
+                              onChange={(event) => setEditDates((old) => ({
+                                ...old,
+                                [lesson.attendanceId]: event.target.value,
+                              }))}
+                            />
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <button
+                                className="miniapp-decline-button"
+                                onClick={() => setEditingLesson(null)}
+                              >
+                                Закрыть
+                              </button>
+                              <button
+                                disabled={busy}
+                                className="miniapp-approve-button"
+                                onClick={() => void action({
+                                  action: "rescheduleIndividual",
+                                  attendanceId: lesson.attendanceId,
+                                  startsAt: editDates[lesson.attendanceId] || dateTimeInput(lesson.startsAt),
+                                }).then((result) => {
+                                  if (result) setEditingLesson(null);
+                                })}
+                              >
+                                Сохранить
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              disabled={busy}
+                              className="miniapp-decline-button"
+                              onClick={() => {
+                                if (window.confirm("Отменить занятие? Если до начала меньше 30 минут, оно спишется с абонемента.")) {
+                                  void action({
+                                    action: "cancelIndividual",
+                                    attendanceId: lesson.attendanceId,
+                                  });
+                                }
+                              }}
+                            >
+                              Отменить
+                            </button>
+                            <button
+                              className="miniapp-receipt-button"
+                              onClick={() => {
+                                setEditDates((old) => ({
+                                  ...old,
+                                  [lesson.attendanceId]: dateTimeInput(lesson.startsAt),
+                                }));
+                                setEditingLesson(lesson.attendanceId);
+                              }}
+                            >
+                              Перенести
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {lesson.format === "group" && (
+                      <div className="miniapp-reschedule-box mt-4">
+                        {targets.length ? (
+                          <>
+                            <label>Перенести без списания</label>
+                            <select
+                              value={selectedTarget || ""}
+                              onChange={(event) => setTransferTargets((old) => ({
+                                ...old,
+                                [lesson.attendanceId]: Number(event.target.value),
+                              }))}
+                            >
+                              {targets.map((target) => (
+                                <option key={target.id} value={target.id}>
+                                  {formatScheduleDate(target.startsAt)}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              disabled={busy || !selectedTarget}
+                              className="miniapp-receipt-button mt-2 w-full"
+                              onClick={() => {
+                                if (window.confirm("Перенести запись на выбранное занятие?")) {
+                                  void action({
+                                    action: "transferGroup",
+                                    attendanceId: lesson.attendanceId,
+                                    targetLessonId: selectedTarget,
+                                  });
+                                }
+                              }}
+                            >
+                              Перенести запись
+                            </button>
+                          </>
+                        ) : (
+                          <p className="text-sm opacity-55">Других доступных дат пока нет.</p>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              }) : <div className="miniapp-empty">Подтверждённых записей пока нет.</div>}
+            </div>
+
+            {individualSubscriptions.length > 0 && (
+              <div className="mt-7">
+                <p className="miniapp-kicker">Индивидуально</p>
+                <h3 className="text-xl font-bold">Поставить занятия</h3>
+                <div className="mt-3 space-y-3">
+                  {individualSubscriptions.map((subscription) => {
+                    const available = Math.max(0, subscription.remaining - subscription.scheduledLessons);
+                    return (
+                      <article key={subscription.id} className="miniapp-individual-plan">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <span className="miniapp-type">
+                              {subscription.type === "online" ? "Онлайн" : "Офлайн"}
+                            </span>
+                            <h4 className="mt-2 font-bold">{subscription.name}</h4>
+                          </div>
+                          <span className="text-sm font-semibold opacity-65">
+                            можно поставить {available}
+                          </span>
+                        </div>
+                        {available > 0 && (
+                          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+                            <input
+                              type="datetime-local"
+                              value={individualDates[subscription.id] || dateTimeInput()}
+                              onChange={(event) => setIndividualDates((old) => ({
+                                ...old,
+                                [subscription.id]: event.target.value,
+                              }))}
+                            />
+                            <button
+                              disabled={busy}
+                              className="miniapp-small-button"
+                              onClick={() => void action({
+                                action: "scheduleIndividual",
+                                subscriptionId: subscription.id,
+                                startsAt: individualDates[subscription.id] || dateTimeInput(),
+                              })}
+                            >
+                              Добавить
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-8">
+              <p className="miniapp-kicker">Групповые занятия</p>
+              <h3 className="text-xl font-bold">Выберите занятие</h3>
+            </div>
             <div className="miniapp-segment mt-4">
               <button className={type === "online" ? "active" : ""} onClick={() => setType("online")}>Онлайн</button>
               <button className={type === "offline" ? "active" : ""} onClick={() => setType("offline")}>Офлайн</button>
@@ -440,7 +699,7 @@ export function MiniApp() {
                 return (
                   <article key={lesson.id} className="miniapp-row">
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold">{formatDate(lesson.startsAt, true)}</p>
+                      <p className="font-bold">{formatScheduleDate(lesson.startsAt)}</p>
                       <p className="mt-1 truncate text-sm opacity-60">{lesson.title}</p>
                       {lesson.free !== null && lesson.free <= 3 && (
                         <p className="mt-1 text-xs font-semibold text-[var(--mini-accent)]">

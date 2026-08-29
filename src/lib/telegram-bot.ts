@@ -323,8 +323,13 @@ async function bookLesson(
     }
     await tx.attendance.upsert({
       where: { lessonId_clientId: { lessonId, clientId: client.id } },
-      create: { lessonId, clientId: client.id, status: "enrolled" },
-      update: { status: "enrolled" },
+      create: {
+        lessonId,
+        clientId: client.id,
+        status: "enrolled",
+        enrollmentSource: "bot",
+      },
+      update: { status: "enrolled", enrollmentSource: "bot" },
     });
     return { ok: true as const, lesson };
   });

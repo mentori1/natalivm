@@ -266,6 +266,8 @@ export async function createSubscription(fd: FormData) {
             create: {
               clientId,
               status: "enrolled",
+              enrollmentSource: "individual",
+              plannedSubscriptionId: subscription.id,
             },
           },
         },
@@ -718,6 +720,7 @@ async function autoEnrollGroupSubscribers(lessonId: number) {
       lessonId,
       clientId,
       status: "enrolled",
+      enrollmentSource: "auto",
     })),
   });
 }
@@ -749,7 +752,7 @@ export async function enrollClient(fd: FormData) {
     const enrolled = lesson.attendances.filter((item) => item.status !== "absent").length;
     if (lesson.capacity && enrolled >= lesson.capacity) return "full" as const;
     await tx.attendance.create({
-      data: { lessonId, clientId, status: "enrolled" },
+      data: { lessonId, clientId, status: "enrolled", enrollmentSource: "crm" },
     });
     return "created" as const;
   });
@@ -783,7 +786,7 @@ export async function setAttendance(fd: FormData) {
 
   const att = await prisma.attendance.findUnique({
     where: { id },
-    include: { lesson: true },
+    include: { lesson: true, plannedSubscription: true },
   });
   if (!att) return;
 
@@ -794,17 +797,22 @@ export async function setAttendance(fd: FormData) {
   let subscriptionId: number | null = null;
   if (next === "present") {
     const now = new Date();
-    const subs = await prisma.subscription.findMany({
-      where: {
-        clientId: att.clientId,
-        type: att.lesson.type,
-        format: att.lesson.format,
-      },
-    });
-    const usable = subs
-      .filter((s) => isUsable(s, now) && remaining(s) > 0)
-      .sort((a, b) => a.expiresAt.getTime() - b.expiresAt.getTime());
-    const chosen = usable[0];
+    const planned = att.plannedSubscription;
+    const subs = planned
+      ? []
+      : await prisma.subscription.findMany({
+          where: {
+            clientId: att.clientId,
+            type: att.lesson.type,
+            format: att.lesson.format,
+          },
+        });
+    const chosen =
+      planned && isUsable(planned, att.lesson.startsAt) && remaining(planned) > 0
+        ? planned
+        : subs
+            .filter((s) => isUsable(s, now) && remaining(s) > 0)
+            .sort((a, b) => a.expiresAt.getTime() - b.expiresAt.getTime())[0];
     if (chosen) {
       const used = chosen.usedLessons + 1;
       subscriptionId = chosen.id;
