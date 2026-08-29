@@ -6,7 +6,7 @@ import {
   formatDateTime,
   remaining,
 } from "@/lib/domain";
-import { getBotSettings } from "@/lib/bot-settings";
+import { DEFAULT_BOT_TEXT, getBotSettings } from "@/lib/bot-settings";
 import { ensureDefaultPriceItems } from "@/lib/prices";
 import { createBooking } from "@/lib/telegram-client-bot";
 import { sendTelegramMessage } from "@/lib/telegram-api";
@@ -80,8 +80,13 @@ export async function GET(req: NextRequest) {
       orderBy: { lesson: { startsAt: "asc" } },
     });
     const prices = await prisma.priceItem.findMany({
-      where: { active: true, kind: "subscription", format: "group" },
-      orderBy: [{ type: "asc" }, { sortOrder: "asc" }, { id: "asc" }],
+      where: { active: true },
+      orderBy: [
+        { type: "asc" },
+        { format: "asc" },
+        { sortOrder: "asc" },
+        { id: "asc" },
+      ],
     });
     const settings = await getBotSettings();
 
@@ -136,8 +141,11 @@ export async function GET(req: NextRequest) {
         id: item.id,
         name: item.name,
         type: item.type,
+        kind: item.kind,
+        format: item.format,
         price: item.price,
         minLessons: item.minLessons || 4,
+        purchasable: item.kind === "subscription" && item.format === "group",
       })),
       preferences: {
         preferredType: fullClient.portalPreference?.preferredType || "both",
@@ -146,6 +154,10 @@ export async function GET(req: NextRequest) {
           : [],
       },
       paymentReady: Boolean(settings.paymentDetails),
+      trainer: {
+        text: settings.trainerText || DEFAULT_BOT_TEXT.trainer,
+        imageUrl: "/bot-trainer.jpg",
+      },
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {

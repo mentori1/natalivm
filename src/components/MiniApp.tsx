@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Tab = "home" | "schedule" | "subscriptions" | "profile";
+type Tab = "home" | "schedule" | "subscriptions" | "trainer" | "profile";
 type LessonType = "online" | "offline";
 type PortalData = {
   user: { firstName: string; photoUrl: string | null; username: string | null };
@@ -40,11 +40,15 @@ type PortalData = {
     id: number;
     name: string;
     type: LessonType;
+    kind: string;
+    format: string;
     price: number;
     minLessons: number;
+    purchasable: boolean;
   }>;
   preferences: { preferredType: string; preferredWeekdays: number[] };
   paymentReady: boolean;
+  trainer: { text: string; imageUrl: string };
 };
 
 declare global {
@@ -229,25 +233,27 @@ export function MiniApp() {
         {tab === "home" && (
           <div className="space-y-6">
             <section className="miniapp-hero">
-              <p className="text-xs font-semibold uppercase opacity-60">Ближайшее занятие</p>
-              {nextBooking ? (
-                <>
-                  <p className="mt-3 text-3xl font-bold">{formatDate(nextBooking.startsAt, true)}</p>
-                  <p className="mt-1 opacity-75">
-                    {nextBooking.type === "online" ? "Онлайн" : "Офлайн"} · {nextBooking.title}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-3 text-2xl font-bold">Пока ничего не запланировано</p>
-                  <button
-                    className="miniapp-hero-button mt-5"
-                    onClick={() => setTab("schedule")}
-                  >
-                    Выбрать занятие
-                  </button>
-                </>
-              )}
+              <div className="miniapp-hero-glass">
+                <p className="text-xs font-semibold uppercase opacity-60">Ближайшее занятие</p>
+                {nextBooking ? (
+                  <>
+                    <p className="mt-3 text-3xl font-bold">{formatDate(nextBooking.startsAt, true)}</p>
+                    <p className="mt-1 opacity-75">
+                      {nextBooking.type === "online" ? "Онлайн" : "Офлайн"} · {nextBooking.title}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-3 text-2xl font-bold">Пока ничего не запланировано</p>
+                    <button
+                      className="miniapp-hero-button mt-5"
+                      onClick={() => setTab("schedule")}
+                    >
+                      Выбрать занятие
+                    </button>
+                  </>
+                )}
+              </div>
             </section>
 
             <section>
@@ -330,24 +336,34 @@ export function MiniApp() {
                 return (
                   <article key={price.id} className="miniapp-price">
                     <div>
-                      <span className="miniapp-type">{price.type === "online" ? "Онлайн" : "Офлайн"}</span>
-                      <h3 className="mt-2 font-bold">{price.name}</h3>
-                      <p className="mt-1 text-sm opacity-60">{money(price.price)} за занятие</p>
-                    </div>
-                    <div className="mt-5 flex items-center justify-between gap-3">
-                      <div className="miniapp-stepper">
-                        <button onClick={() => setLessonCounts((old) => ({ ...old, [price.id]: Math.max(price.minLessons, count - 1) }))}>−</button>
-                        <span>{count}</span>
-                        <button onClick={() => setLessonCounts((old) => ({ ...old, [price.id]: count + 1 }))}>+</button>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="miniapp-type">{price.type === "online" ? "Онлайн" : "Офлайн"}</span>
+                        <span className="miniapp-type is-muted">
+                          {price.format === "individual" ? "Индивидуально" : "Группа"}
+                        </span>
                       </div>
-                      <button
-                        disabled={busy}
-                        className="miniapp-small-button"
-                        onClick={() => void action({ action: "subscription", priceItemId: price.id, totalLessons: count })}
-                      >
-                        {money(price.price * count)}
-                      </button>
+                      <h3 className="mt-2 font-bold">{price.name}</h3>
+                      <p className="mt-1 text-sm opacity-60">
+                        {money(price.price)}
+                        {price.kind === "subscription" ? " за занятие" : ""}
+                      </p>
                     </div>
+                    {price.purchasable && (
+                      <div className="mt-5 flex items-center justify-between gap-3">
+                        <div className="miniapp-stepper">
+                          <button onClick={() => setLessonCounts((old) => ({ ...old, [price.id]: Math.max(price.minLessons, count - 1) }))}>−</button>
+                          <span>{count}</span>
+                          <button onClick={() => setLessonCounts((old) => ({ ...old, [price.id]: count + 1 }))}>+</button>
+                        </div>
+                        <button
+                          disabled={busy}
+                          className="miniapp-small-button"
+                          onClick={() => void action({ action: "subscription", priceItemId: price.id, totalLessons: count })}
+                        >
+                          Купить · {money(price.price * count)}
+                        </button>
+                      </div>
+                    )}
                   </article>
                 );
               })}
@@ -394,6 +410,21 @@ export function MiniApp() {
             </div>
           </section>
         )}
+
+        {tab === "trainer" && (
+          <section>
+            <p className="miniapp-kicker">Практика</p>
+            <h2 className="miniapp-title">Тренажёр «Волна»</h2>
+            <div className="miniapp-trainer-photo mt-4">
+              {/* Изображение хранится в проекте и не зависит от Telegram CDN. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={data.trainer.imageUrl} alt="Тренажёр Волна" />
+            </div>
+            <div className="miniapp-trainer-copy mt-4 whitespace-pre-line">
+              {data.trainer.text}
+            </div>
+          </section>
+        )}
       </div>
 
       <nav className="miniapp-nav" aria-label="Разделы личного кабинета">
@@ -401,6 +432,7 @@ export function MiniApp() {
           ["home", "Главная", "⌂"],
           ["schedule", "Запись", "◷"],
           ["subscriptions", "Абонемент", "◇"],
+          ["trainer", "Тренажёр", "∿"],
           ["profile", "Профиль", "○"],
         ] as Array<[Tab, string, string]>).map(([value, label, icon]) => (
           <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>

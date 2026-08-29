@@ -33,8 +33,10 @@
 }
 .miniapp-avatar { display:grid; width:52px; height:52px; flex:0 0 auto; place-items:center; overflow:hidden; border:1px solid rgba(26,10,15,.13); border-radius:50%; background:var(--mini-surface); font-weight:800; }
 .miniapp-avatar img { width:100%; height:100%; object-fit:cover; }
-.miniapp-hero { border-radius:22px; background:var(--mini-ink); color:var(--mini-bg); padding:24px; box-shadow:0 16px 36px rgba(26,10,15,.14); }
-.miniapp-hero-button { border:1px solid rgba(246,230,234,.4); border-radius:14px; padding:11px 15px; font-size:14px; font-weight:700; }
+.miniapp-hero { display:flex; min-height:270px; align-items:flex-end; overflow:hidden; border:1px solid rgba(255,255,255,.24); border-radius:22px; background-image:url('/miniapp-loft-studio.png'); background-position:center; background-size:cover; padding:14px; box-shadow:0 16px 36px rgba(26,10,15,.16); }
+.miniapp-hero-glass { width:100%; border:1px solid rgba(255,255,255,.38); border-radius:17px; background:rgba(246,230,234,.72); color:var(--mini-ink); padding:18px; box-shadow:0 10px 28px rgba(26,10,15,.16); backdrop-filter:blur(18px) saturate(1.12); -webkit-backdrop-filter:blur(18px) saturate(1.12); }
+.miniapp-hero-button { border:1px solid rgba(255,255,255,.52); border-radius:13px; background:rgba(255,249,251,.44); padding:11px 15px; color:var(--mini-ink); font-size:14px; font-weight:750; box-shadow:inset 0 1px 0 rgba(255,255,255,.46); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); transition:background .16s ease, transform .16s ease; }
+.miniapp-hero-button:active { background:rgba(255,249,251,.68); transform:scale(.98); }
 .miniapp-kicker { color:var(--mini-accent); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 .miniapp-title { margin-top:3px; font-size:24px; font-weight:800; }
 .miniapp-link { color:var(--mini-accent); font-size:13px; font-weight:700; }
@@ -43,7 +45,11 @@
 .miniapp-row { display:flex; align-items:center; gap:14px; padding:16px; }
 .miniapp-price, .miniapp-subscription { padding:18px; }
 .miniapp-profile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px; }
+.miniapp-trainer-photo { aspect-ratio:4/3; overflow:hidden; border:1px solid rgba(26,10,15,.11); border-radius:20px; background:var(--mini-surface); }
+.miniapp-trainer-photo img { width:100%; height:100%; object-fit:cover; }
+.miniapp-trainer-copy { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); padding:18px; color:rgba(26,10,15,.72); font-size:14px; line-height:1.65; }
 .miniapp-type { display:inline-flex; border-radius:999px; background:rgba(143,41,71,.1); color:var(--mini-accent); padding:4px 8px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.miniapp-type.is-muted { background:rgba(26,10,15,.06); color:rgba(26,10,15,.56); }
 .miniapp-primary, .miniapp-small-button { border-radius:14px; background:var(--mini-ink); color:var(--mini-bg); font-weight:750; transition:transform .16s ease, opacity .16s ease; }
 .miniapp-primary { min-height:50px; padding:13px 18px; }
 .miniapp-small-button { min-height:40px; flex:0 0 auto; padding:9px 13px; font-size:13px; }
