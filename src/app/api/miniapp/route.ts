@@ -18,7 +18,11 @@ import {
   rejectTrainerPayment,
 } from "@/lib/payment-review";
 import { ensureDefaultPriceItems } from "@/lib/prices";
-import { createBooking, requireSubscription } from "@/lib/telegram-client-bot";
+import {
+  createBooking,
+  hasUsedTrial,
+  requireSubscription,
+} from "@/lib/telegram-client-bot";
 import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import {
@@ -134,18 +138,23 @@ export async function GET(req: NextRequest) {
       where: { clientId: client.id, kind: "trial" },
       select: { type: true },
     });
-    const attendedTrialBookings = await prisma.botBooking.findMany({
+    const confirmedTrialBookings = await prisma.botBooking.findMany({
       where: {
         clientId: client.id,
         kind: "trial",
         status: "confirmed",
+      },
+      select: {
         lesson: {
-          attendances: {
-            some: { clientId: client.id, status: "present" },
+          select: {
+            type: true,
+            attendances: {
+              where: { clientId: client.id, status: "present" },
+              select: { id: true },
+            },
           },
         },
       },
-      select: { lesson: { select: { type: true } } },
     });
     const settings = await getBotSettings();
     const bookingPayments = await prisma.botBooking.findMany({
@@ -314,9 +323,15 @@ export async function GET(req: NextRequest) {
         };
       })
       .filter((lesson) => lesson.available);
+    const usedTrialTypes = new Set([
+      ...trialVisits.map((visit) => visit.type),
+      ...confirmedTrialBookings.map((booking) => booking.lesson.type),
+    ]);
     const attendedTrialTypes = new Set([
       ...trialVisits.map((visit) => visit.type),
-      ...attendedTrialBookings.map((booking) => booking.lesson.type),
+      ...confirmedTrialBookings
+        .filter((booking) => booking.lesson.attendances.length > 0)
+        .map((booking) => booking.lesson.type),
     ]);
     const onlineTrialPrice = prices.find(
       (price) =>
@@ -329,7 +344,7 @@ export async function GET(req: NextRequest) {
     );
     const trialCrossSell =
       attendedTrialTypes.has("offline") &&
-      !attendedTrialTypes.has("online") &&
+      !usedTrialTypes.has("online") &&
       !hasUpcomingOnlineTrial &&
       onlineTrialPrice &&
       availableLessons.some((lesson) => lesson.type === "online")
@@ -385,16 +400,18 @@ export async function GET(req: NextRequest) {
         type: item.lesson.type,
         title: item.lesson.title || "Занятие",
       })),
-      prices: prices.map((item) => ({
-        id: item.id,
-        name: item.name,
-        type: item.type,
-        kind: item.kind,
-        format: item.format,
-        price: item.price,
-        minLessons: item.kind === "subscription" ? (item.minLessons || 4) : 1,
-        requiresLesson: item.kind !== "subscription" && item.format === "group",
-      })),
+      prices: prices
+        .filter((item) => item.kind !== "trial" || !usedTrialTypes.has(item.type))
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          kind: item.kind,
+          format: item.format,
+          price: item.price,
+          minLessons: item.kind === "subscription" ? (item.minLessons || 4) : 1,
+          requiresLesson: item.kind !== "subscription" && item.format === "group",
+        })),
       trialCrossSell,
       preferences: {
         preferredType: fullClient.portalPreference?.preferredType || "both",
@@ -514,9 +531,18 @@ export async function POST(req: NextRequest) {
       if (body.paymentKind === "booking" && body.decision === "approve") {
         const result = await approveBookingPayment(id, adminId);
         if (!result.ok) {
+          if (result.reason === "trial_used" && result.booking) {
+            const format = result.booking.lesson.type === "online" ? "онлайн" : "офлайн";
+            await sendTelegramMessage(
+              result.booking.telegramChatId,
+              `Пробное ${format}-занятие уже было использовано. Выберите разовое занятие или абонемент.`,
+            ).catch(() => undefined);
+          }
           throw new Error(
             result.reason === "full"
               ? "Занятие уже прошло или мест больше нет"
+              : result.reason === "trial_used"
+                ? "Пробное этого формата уже использовано"
               : "Платёж уже обработан",
           );
         }
@@ -589,17 +615,35 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "book") {
-      if (!Number.isInteger(body.lessonId) || Number(body.lessonId) < 1) {
+      const lessonId = Number(body.lessonId);
+      if (!Number.isInteger(lessonId) || lessonId < 1) {
         throw new Error("Занятие не выбрано");
       }
-      await createBooking(String(user.id), user, Number(body.lessonId), {
+      if (body.priceItemId) {
+        const selectedPrice = await prisma.priceItem.findFirst({
+          where: { id: Number(body.priceItemId), active: true },
+          select: { kind: true, type: true },
+        });
+        if (!selectedPrice) throw new Error("Тариф больше недоступен");
+        if (
+          selectedPrice.kind === "trial" &&
+          (selectedPrice.type === "online" || selectedPrice.type === "offline") &&
+          await hasUsedTrial(client.id, selectedPrice.type)
+        ) {
+          const format = selectedPrice.type === "online" ? "онлайн" : "офлайн";
+          throw new Error(
+            `Пробное ${format}-занятие уже использовано. Выберите разовое занятие или абонемент.`,
+          );
+        }
+      }
+      await createBooking(String(user.id), user, lessonId, {
         notifyChat: false,
         priceItemId: body.priceItemId,
       });
       const booking = await prisma.botBooking.findFirst({
         where: {
           clientId: client.id,
-          lessonId: Number(body.lessonId),
+          lessonId,
           status: { in: ["awaiting_receipt", "review", "confirmed"] },
         },
         orderBy: { createdAt: "desc" },

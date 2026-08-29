@@ -31,6 +31,41 @@ export async function approveBookingPayment(
     if (!booking || booking.status !== "review" || !booking.clientId) {
       return { ok: false as const, reason: "changed" as const };
     }
+    if (booking.kind === "trial") {
+      if (usesPostgres) {
+        const typeKey = booking.lesson.type === "online" ? 1 : 2;
+        await tx.$executeRaw`select pg_advisory_xact_lock(${booking.clientId}, ${typeKey})`;
+      }
+      const recordedTrial = await tx.singleVisit.findFirst({
+        where: {
+          clientId: booking.clientId,
+          kind: "trial",
+          type: booking.lesson.type,
+        },
+        select: { id: true },
+      });
+      const confirmedTrial = await tx.botBooking.findFirst({
+        where: {
+          id: { not: booking.id },
+          clientId: booking.clientId,
+          kind: "trial",
+          status: "confirmed",
+          lesson: { type: booking.lesson.type },
+        },
+        select: { id: true },
+      });
+      if (recordedTrial || confirmedTrial) {
+        await tx.botBooking.update({
+          where: { id: bookingId },
+          data: {
+            status: "rejected",
+            reviewedByTelegramId: adminTelegramId,
+            reviewedAt: now,
+          },
+        });
+        return { ok: false as const, reason: "trial_used" as const, booking };
+      }
+    }
     const enrolled = booking.lesson.attendances.filter(
       (item) => item.status !== "absent",
     ).length;

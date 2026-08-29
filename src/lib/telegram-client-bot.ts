@@ -603,6 +603,7 @@ async function quoteForClient(
   lessonDate: Date,
   priceItemId?: number,
 ) {
+  const trialUsed = await hasUsedTrial(clientId, type);
   if (priceItemId) {
     const selected = await prisma.priceItem.findFirst({
       where: {
@@ -614,6 +615,7 @@ async function quoteForClient(
       },
     });
     if (!selected) return null;
+    if (selected.kind === "trial" && trialUsed) return null;
     return {
       kind: selected.kind,
       tariffName: selected.name,
@@ -635,23 +637,13 @@ async function quoteForClient(
     };
   }
 
-  const subscriptionCount = await prisma.subscription.count({ where: { clientId } });
-  const singleVisitCount = await prisma.singleVisit.count({ where: { clientId } });
-  const presentCount = await prisma.attendance.count({
-    where: { clientId, status: "present" },
-  });
-  const confirmedBotCount = await prisma.botBooking.count({
-    where: { clientId, status: "confirmed" },
-  });
-  const firstVisit =
-    subscriptionCount + singleVisitCount + presentCount + confirmedBotCount === 0;
-  const kind = firstVisit ? "trial" : "single";
+  const kind = trialUsed ? "single" : "trial";
   await ensureDefaultPriceItems();
   let tariff = await prisma.priceItem.findFirst({
     where: { active: true, kind, type, format: "group" },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
-  if (!tariff && firstVisit) {
+  if (!tariff && !trialUsed) {
     tariff = await prisma.priceItem.findFirst({
       where: { active: true, kind: "single", type, format: "group" },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -660,6 +652,28 @@ async function quoteForClient(
   return tariff
     ? { kind: tariff.kind, tariffName: tariff.name, amount: tariff.price }
     : null;
+}
+
+export async function hasUsedTrial(
+  clientId: number,
+  type: "online" | "offline",
+) {
+  const singleVisit = await prisma.singleVisit.findFirst({
+    where: { clientId, type, kind: "trial" },
+    select: { id: true },
+  });
+  if (singleVisit) return true;
+
+  const confirmedBooking = await prisma.botBooking.findFirst({
+    where: {
+      clientId,
+      kind: "trial",
+      status: "confirmed",
+      lesson: { type },
+    },
+    select: { id: true },
+  });
+  return Boolean(confirmedBooking);
 }
 
 export async function createBooking(
@@ -1038,10 +1052,19 @@ async function approveBooking(query: TelegramCallbackQuery, bookingId: number) {
 
   await editCallbackButtons(query);
   if (!result.ok) {
+    if (result.reason === "trial_used" && result.booking) {
+      const format = result.booking.lesson.type === "online" ? "онлайн" : "офлайн";
+      await replaceScreen(
+        result.booking.telegramChatId,
+        `Пробное ${format}-занятие уже было использовано. Выберите разовое занятие или абонемент.`,
+      ).catch(() => undefined);
+    }
     await answerCallback(
       query.id,
       result.reason === "full"
         ? "Занятие уже прошло или мест больше нет"
+        : result.reason === "trial_used"
+          ? "Пробное этого формата уже использовано"
         : result.reason === "already"
           ? "Уже подтверждено"
           : result.reason === "not_found"
