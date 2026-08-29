@@ -191,6 +191,8 @@ export function MiniApp() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
   const [type, setType] = useState<LessonType>("online");
+  const [priceType, setPriceType] = useState<LessonType>("online");
+  const [priceFormat, setPriceFormat] = useState<"group" | "individual">("group");
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [preferredType, setPreferredType] = useState("both");
   const [lessonCounts, setLessonCounts] = useState<Record<number, number>>({});
@@ -345,6 +347,9 @@ export function MiniApp() {
     () => data?.lessons.filter((lesson) => lesson.type === type) || [],
     [data, type],
   );
+  const filteredPrices = data?.prices.filter(
+    (price) => price.type === priceType && price.format === priceFormat,
+  ) || [];
   const nextBooking = data?.scheduledLessons[0] ||
     data?.bookings.find((booking) => booking.status === "confirmed");
   const bookedLessonIds = new Set([
@@ -735,8 +740,40 @@ export function MiniApp() {
                 ))}
               </div>
             )}
-            <div className="mt-6 space-y-3">
-              {data.prices.map((price) => {
+            <div className="mt-6">
+              <p className="text-xs font-bold uppercase opacity-50">Где заниматься</p>
+              <div className="miniapp-segment mt-2">
+                <button
+                  className={priceType === "online" ? "active" : ""}
+                  onClick={() => setPriceType("online")}
+                >
+                  Онлайн
+                </button>
+                <button
+                  className={priceType === "offline" ? "active" : ""}
+                  onClick={() => setPriceType("offline")}
+                >
+                  Офлайн
+                </button>
+              </div>
+              <p className="mt-4 text-xs font-bold uppercase opacity-50">Формат</p>
+              <div className="miniapp-segment mt-2">
+                <button
+                  className={priceFormat === "group" ? "active" : ""}
+                  onClick={() => setPriceFormat("group")}
+                >
+                  Групповые
+                </button>
+                <button
+                  className={priceFormat === "individual" ? "active" : ""}
+                  onClick={() => setPriceFormat("individual")}
+                >
+                  Индивидуальные
+                </button>
+              </div>
+            </div>
+            <div className="mt-5 space-y-3">
+              {filteredPrices.map((price) => {
                 const count = lessonCounts[price.id] || price.minLessons;
                 return (
                   <article key={price.id} className="miniapp-price">
@@ -775,6 +812,9 @@ export function MiniApp() {
                   </article>
                 );
               })}
+              {filteredPrices.length === 0 && (
+                <div className="miniapp-empty">Тарифов этого формата пока нет.</div>
+              )}
             </div>
           </section>
         )}

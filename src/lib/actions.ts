@@ -7,6 +7,7 @@ import { findClientDuplicates } from "@/lib/queries";
 import {
   currentMoscowWallClockDate,
   derivedSubStatus,
+  formatDateTime,
   formatRussianPhone,
   isUsable,
   normalizeSourceDetail,
@@ -59,6 +60,35 @@ function wallClockDateTimes(fd: FormData, key: string): Date[] {
     if (!isNaN(date.getTime())) unique.set(date.getTime(), date);
   }
   return [...unique.values()].sort((a, b) => a.getTime() - b.getTime());
+}
+
+function repeatedLessonStarts(
+  fd: FormData,
+  first: Date,
+  format: "group" | "individual",
+) {
+  if (format !== "group") return [first];
+  const weekdays = new Set(
+    fd
+      .getAll("repeatWeekdays")
+      .map(Number)
+      .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7),
+  );
+  const untilRaw = str(fd, "repeatUntil");
+  const until = /^\d{4}-\d{2}-\d{2}$/.test(untilRaw)
+    ? new Date(`${untilRaw}T23:59:59Z`)
+    : null;
+  if (!until || until < first || weekdays.size === 0) return [first];
+
+  const result: Date[] = [];
+  const cursor = new Date(first);
+  cursor.setUTCHours(first.getUTCHours(), first.getUTCMinutes(), 0, 0);
+  for (let day = 0; cursor <= until && day <= 370 && result.length < 180; day += 1) {
+    const isoWeekday = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay();
+    if (weekdays.has(isoWeekday)) result.push(new Date(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return result.length ? result : [first];
 }
 
 function priceKind(fd: FormData): PriceKind {
@@ -328,13 +358,34 @@ export async function unfreezeSubscription(fd: FormData) {
 export async function deleteSubscription(fd: FormData) {
   const id = num(fd, "id");
   if (!id) return;
-  const sub = await prisma.subscription.findUnique({ where: { id } });
-  await prisma.subscription.delete({ where: { id } });
+  const sub = await prisma.subscription.findUnique({
+    where: { id },
+    include: {
+      plannedAttendances: {
+        where: {
+          status: "enrolled",
+          lesson: {
+            format: "individual",
+            startsAt: { gte: currentMoscowWallClockDate() },
+          },
+        },
+        select: { lessonId: true },
+      },
+    },
+  });
+  if (!sub) return;
+  await prisma.$transaction(async (tx) => {
+    if (sub.plannedAttendances.length > 0) {
+      await tx.lesson.deleteMany({
+        where: { id: { in: sub.plannedAttendances.map((item) => item.lessonId) } },
+      });
+    }
+    await tx.subscription.delete({ where: { id } });
+  });
   revalidatePath("/");
-  if (sub) {
-    revalidatePath(`/clients/${sub.clientId}`);
-    redirect(`/clients/${sub.clientId}`);
-  }
+  revalidatePath("/lessons");
+  revalidatePath(`/clients/${sub.clientId}`);
+  redirect(`/clients/${sub.clientId}`);
 }
 
 /** Отметить/снять день посещения в календаре абонемента */
@@ -627,25 +678,49 @@ function lessonCapacity(
 }
 
 export async function createLesson(fd: FormData) {
-  const startsAt = wallClockDateTimeOrNull(fd, "startsAt");
-  if (!startsAt) return;
+  const firstStartsAt = wallClockDateTimeOrNull(fd, "startsAt");
+  if (!firstStartsAt) return;
   const format = lessonFormat(fd);
   const type = str(fd, "type") === "online" ? "online" : "offline";
-  const lesson = await prisma.lesson.create({
-    data: {
-      title: strOrNull(fd, "title"),
-      type,
-      format,
-      startsAt,
-      capacity: lessonCapacity(format, type, num(fd, "capacity", 0)),
-      meetingUrl: strOrNull(fd, "meetingUrl"),
-      location: strOrNull(fd, "location"),
-    },
+  const starts = repeatedLessonStarts(fd, firstStartsAt, format);
+  const baseTitle = strOrNull(fd, "title");
+  const capacity = lessonCapacity(format, type, num(fd, "capacity", 0));
+  const meetingUrl = strOrNull(fd, "meetingUrl");
+  const location = strOrNull(fd, "location");
+  const lessonIds = await prisma.$transaction(async (tx) => {
+    const created: number[] = [];
+    for (const startsAt of starts) {
+      const duplicate = await tx.lesson.findFirst({
+        where: { startsAt, type, format },
+        select: { id: true },
+      });
+      if (duplicate) continue;
+      const generatedTitle = `${format === "group" ? "Групповое" : "Индивидуальное"} ${type === "online" ? "онлайн" : "офлайн"} · ${formatDateTime(startsAt)}`;
+      const lesson = await tx.lesson.create({
+        data: {
+          title:
+            starts.length > 1 && baseTitle
+              ? `${baseTitle} · ${formatDateTime(startsAt)}`
+              : baseTitle || generatedTitle,
+          type,
+          format,
+          startsAt,
+          capacity,
+          meetingUrl,
+          location,
+        },
+      });
+      created.push(lesson.id);
+    }
+    return created;
   });
-  await autoEnrollGroupSubscribers(lesson.id);
+  for (const lessonId of lessonIds) await autoEnrollGroupSubscribers(lessonId);
   revalidatePath("/lessons");
   revalidatePath("/");
-  redirect(`/lessons/${lesson.id}`);
+  if (lessonIds.length === 1 && starts.length === 1) {
+    redirect(`/lessons/${lessonIds[0]}`);
+  }
+  redirect(`/lessons?created=${lessonIds.length}&skipped=${starts.length - lessonIds.length}`);
 }
 
 export async function updateLessonSettings(fd: FormData) {

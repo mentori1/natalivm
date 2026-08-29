@@ -13,6 +13,22 @@ function defaultStart(): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
+function defaultRepeatUntil(): string {
+  const date = currentMoscowWallClockDate();
+  date.setUTCDate(date.getUTCDate() + 60);
+  return date.toISOString().slice(0, 10);
+}
+
+const WEEKDAYS = [
+  [1, "Пн"],
+  [2, "Вт"],
+  [3, "Ср"],
+  [4, "Чт"],
+  [5, "Пт"],
+  [6, "Сб"],
+  [7, "Вс"],
+] as const;
+
 export default function NewLessonPage() {
   return (
     <div className="space-y-6">
@@ -28,8 +44,8 @@ export default function NewLessonPage() {
 
       <form action={createLesson} className="space-y-5">
         <Card className="space-y-4 p-5">
-          <Field label="Название">
-            <Input name="title" placeholder="Оффлайн группа" />
+          <Field label="Название (необязательно)">
+            <Input name="title" placeholder="Сформируется из формата, даты и времени" />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Формат">
@@ -47,7 +63,7 @@ export default function NewLessonPage() {
             <Field label="Мест" hint="По умолчанию: онлайн 20, офлайн 8, индивидуальное 1">
               <Input name="capacity" type="number" min={1} placeholder="8" />
             </Field>
-            <Field label="Дата и время">
+            <Field label="Дата и время первого занятия">
               <Input
                 name="startsAt"
                 type="datetime-local"
@@ -63,8 +79,35 @@ export default function NewLessonPage() {
             </Field>
           </div>
         </Card>
+
+        <Card className="space-y-4 p-5">
+          <div>
+            <p className="font-bold text-ink">Повторение группового занятия</p>
+          </div>
+          <Field label="Дни недели">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {WEEKDAYS.map(([value, label]) => (
+                <label
+                  key={value}
+                  className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-2 text-sm font-semibold text-ink has-checked:border-brand has-checked:bg-brand has-checked:text-brand-contrast"
+                >
+                  <input
+                    className="sr-only"
+                    type="checkbox"
+                    name="repeatWeekdays"
+                    value={value}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </Field>
+          <Field label="Создавать до">
+            <Input name="repeatUntil" type="date" defaultValue={defaultRepeatUntil()} />
+          </Field>
+        </Card>
         <div className="flex justify-end">
-          <SubmitButton>Создать занятие</SubmitButton>
+          <SubmitButton>Создать</SubmitButton>
         </div>
       </form>
     </div>

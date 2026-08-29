@@ -43,6 +43,8 @@ export default async function LessonsPage({
     view?: string;
     m?: string;
     d?: string;
+    created?: string;
+    skipped?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -53,6 +55,8 @@ export default async function LessonsPage({
       ? params.format
       : "all";
   const view: LessonView = params.view === "calendar" ? "calendar" : "list";
+  const created = Math.max(0, Number(params.created) || 0);
+  const skipped = Math.max(0, Number(params.skipped) || 0);
   const now = currentMoscowWallClockDate();
   const selectedMonth = parseMonth(params.m) ?? new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -92,6 +96,13 @@ export default async function LessonsPage({
           Создать
         </Link>
       </header>
+
+      {(created > 0 || skipped > 0) && (
+        <div className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink">
+          Создано занятий: {created}
+          {skipped > 0 ? `. Уже были в расписании: ${skipped}` : ""}
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-3">

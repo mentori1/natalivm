@@ -43,6 +43,7 @@ WITH candidates AS (
   JOIN "Lesson" AS lesson ON lesson."id" = attendance."lessonId"
   WHERE lesson."format" = 'individual'
     AND attendance."status" = 'enrolled'
+    AND lesson."startsAt" >= NOW()
     AND attendance."plannedSubscriptionId" IS NULL
 )
 UPDATE "Attendance" AS attendance
