@@ -75,7 +75,7 @@ export default async function FinancePage({
   });
   const botPayments = await prisma.botBooking.findMany({
     where: {
-      status: "confirmed",
+      status: { in: ["confirmed", "credit"] },
       amount: { gt: 0 },
       reviewedAt: { gte: mStart, lte: mEnd },
     },

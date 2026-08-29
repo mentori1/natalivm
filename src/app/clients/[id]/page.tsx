@@ -68,7 +68,10 @@ export default async function ClientCardPage({
       },
       singleVisits: { orderBy: { date: "desc" } },
       botBookings: {
-        where: { status: "confirmed", amount: { gt: 0 } },
+        where: {
+          status: { in: ["confirmed", "credit"] },
+          amount: { gt: 0 },
+        },
         orderBy: { reviewedAt: "desc" },
       },
       notes: { orderBy: { createdAt: "desc" } },
@@ -256,6 +259,41 @@ export default async function ClientCardPage({
           </div>
         )}
       </section>
+
+      {/* Подтверждённые оплаты через Telegram-бота */}
+      {client.botBookings.length > 0 && (
+        <section>
+          <SectionTitle>Оплаты через бот</SectionTitle>
+          <Card className="divide-y divide-line overflow-hidden p-0">
+            {client.botBookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="flex items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink">
+                    {booking.tariffName || "Занятие"}
+                  </p>
+                  <p className="text-sm text-muted">
+                    {formatDate(booking.reviewedAt ?? booking.createdAt)}
+                    {booking.receiptFileName
+                      ? ` · чек: ${booking.receiptFileName}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-semibold text-green-600">
+                    +{formatMoney(booking.amount)}
+                  </p>
+                  {booking.status === "credit" && (
+                    <p className="text-xs text-brand-dark">Занятие в запасе</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </Card>
+        </section>
+      )}
 
       {/* Разовые и пробные посещения */}
       <section>

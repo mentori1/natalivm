@@ -125,7 +125,7 @@ export async function getDashboard() {
   });
   const botPaymentsThisMonth = await prisma.botBooking.findMany({
     where: {
-      status: "confirmed",
+      status: { in: ["confirmed", "credit"] },
       amount: { gt: 0 },
       reviewedAt: { gte: startOfMonth(now), lte: endOfMonth(now) },
     },

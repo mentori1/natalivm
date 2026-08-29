@@ -404,7 +404,7 @@ model BotBooking {
   client                 Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
   lessonId               Int
   lesson                 Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  status                 String    @default("awaiting_receipt") // awaiting_receipt | review | confirmed | rejected | expired | cancelled
+  status                 String    @default("awaiting_receipt") // awaiting_receipt | review | confirmed | credit | rejected | expired | cancelled
   kind                   String // subscription | trial | single
   tariffName             String?
   amount                 Int       @default(0)
