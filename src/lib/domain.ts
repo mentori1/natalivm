@@ -80,6 +80,8 @@ export function currentMoscowWallClockDate(now = new Date()): Date {
 
 export type Tone = "green" | "amber" | "red" | "slate" | "violet" | "blue";
 
+export const GROUP_BOOKING_CREDIT_VALIDITY_MS = 30 * 24 * 60 * 60 * 1000;
+
 export type PriceKind = "subscription" | "single" | "trial";
 
 export const PRICE_KIND: Record<PriceKind, { label: string; short: string }> = {

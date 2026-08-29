@@ -4,6 +4,7 @@ import {
   currentMoscowWallClockDate,
   derivedSubStatus,
   formatDateTime,
+  GROUP_BOOKING_CREDIT_VALIDITY_MS,
   isUsable,
   remaining,
 } from "@/lib/domain";
@@ -13,7 +14,6 @@ import {
 } from "@/lib/telegram-api";
 
 const CANCELLATION_LIMIT_MS = 30 * 60 * 1000;
-const GROUP_RESERVE_VALIDITY_MS = 30 * 24 * 60 * 60 * 1000;
 
 async function notifyAdmins(message: string) {
   await Promise.allSettled(
@@ -489,7 +489,7 @@ export async function cancelGroupLesson(clientId: number, attendanceId: number) 
       ["trial", "single"].includes(booking.kind),
     );
     const reserveUntil = keepInReserve
-      ? new Date(now.getTime() + GROUP_RESERVE_VALIDITY_MS)
+      ? new Date(now.getTime() + GROUP_BOOKING_CREDIT_VALIDITY_MS)
       : null;
 
     await tx.attendance.delete({ where: { id: attendance.id } });

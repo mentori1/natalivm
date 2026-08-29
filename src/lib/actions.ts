@@ -1,5 +1,6 @@
 "use server";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, usesPostgres } from "@/lib/db";
@@ -9,6 +10,7 @@ import {
   derivedSubStatus,
   formatDateTime,
   formatRussianPhone,
+  GROUP_BOOKING_CREDIT_VALIDITY_MS,
   isUsable,
   normalizeSourceDetail,
   remaining,
@@ -108,6 +110,50 @@ function lessonFormat(fd: FormData): "group" | "individual" {
 
 const DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_TERM_DAYS = 45; // абонемент живёт ~1.5 месяца
+
+async function attachBookingCreditToLesson(
+  tx: Prisma.TransactionClient,
+  clientId: number,
+  lesson: { id: number; type: string; format: string; startsAt: Date },
+) {
+  if (lesson.format !== "group") return null;
+  const credit = await tx.botBooking.findFirst({
+    where: {
+      clientId,
+      status: "credit",
+      kind: { in: ["trial", "single"] },
+      holdExpiresAt: { gte: lesson.startsAt },
+      lesson: { type: lesson.type },
+    },
+    orderBy: [{ holdExpiresAt: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  if (!credit) return null;
+  if (usesPostgres) {
+    await tx.$executeRaw`select pg_advisory_xact_lock(${credit.id}, 91)`;
+  }
+  const activeCredit = await tx.botBooking.findFirst({
+    where: {
+      id: credit.id,
+      clientId,
+      status: "credit",
+      holdExpiresAt: { gte: lesson.startsAt },
+    },
+    select: { id: true },
+  });
+  if (!activeCredit) return null;
+  await tx.botBooking.update({
+    where: { id: activeCredit.id },
+    data: {
+      lessonId: lesson.id,
+      status: "confirmed",
+      holdExpiresAt: lesson.startsAt,
+      reminder3hSentAt: null,
+      reminder1hSentAt: null,
+    },
+  });
+  return activeCredit.id;
+}
 
 // ─────────── Клиенты ───────────
 
@@ -829,6 +875,7 @@ export async function enrollClient(fd: FormData) {
     await tx.attendance.create({
       data: { lessonId, clientId, status: "enrolled", enrollmentSource: "crm" },
     });
+    await attachBookingCreditToLesson(tx, clientId, lesson);
     return "created" as const;
   });
   if (result === "full") redirect(`/lessons/${lessonId}?error=full`);
@@ -841,10 +888,34 @@ export async function unenrollClient(fd: FormData) {
   if (!id) return;
   const att = await prisma.attendance.findUnique({
     where: { id },
-    select: { clientId: true },
+    include: { lesson: true },
   });
   // если запись потребляла занятие — сначала вернём его
   await refundIfConsumed(id);
+  if (
+    att?.status === "enrolled" &&
+    att.lesson.format === "group" &&
+    att.lesson.startsAt > currentMoscowWallClockDate()
+  ) {
+    await prisma.botBooking.updateMany({
+      where: {
+        clientId: att.clientId,
+        lessonId: att.lessonId,
+        status: "confirmed",
+        amount: { gt: 0 },
+        kind: { in: ["trial", "single"] },
+      },
+      data: {
+        status: "credit",
+        holdExpiresAt: new Date(
+          currentMoscowWallClockDate().getTime() +
+            GROUP_BOOKING_CREDIT_VALIDITY_MS,
+        ),
+        reminder3hSentAt: null,
+        reminder1hSentAt: null,
+      },
+    });
+  }
   await prisma.attendance.delete({ where: { id } });
   if (att) await recomputeLastVisit(att.clientId);
   revalidatePath(`/lessons/${lessonId}`);
