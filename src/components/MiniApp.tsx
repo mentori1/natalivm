@@ -70,6 +70,7 @@ type PortalData = {
     minLessons: number;
     requiresLesson: boolean;
   }>;
+  trialCrossSell: { priceItemId: number; price: number } | null;
   preferences: { preferredType: string; preferredWeekdays: number[] };
   paymentReady: boolean;
   paymentDetails: string;
@@ -458,15 +459,36 @@ export function MiniApp() {
                     </p>
                   </>
                 ) : (
-                  <>
-                    <p className="mt-3 text-2xl font-bold">Пока ничего не запланировано</p>
-                    <button
-                      className="miniapp-hero-button mt-5"
-                      onClick={() => setTab("schedule")}
-                    >
-                      Выбрать занятие
-                    </button>
-                  </>
+                  data.trialCrossSell ? (
+                    <>
+                      <p className="mt-3 text-2xl font-bold">Офлайн уже попробовали. Как насчёт онлайн?</p>
+                      <p className="mt-2 text-sm leading-relaxed opacity-75">
+                        Запишитесь на пробное онлайн-занятие и сравните оба формата,
+                        чтобы понять, какой подходит вам больше.
+                      </p>
+                      <button
+                        className="miniapp-hero-button mt-5"
+                        onClick={() => {
+                          setType("online");
+                          setSelectedBookingPriceId(data.trialCrossSell?.priceItemId || null);
+                          setNotice("Выберите дату пробного онлайн-занятия");
+                          setTab("schedule");
+                        }}
+                      >
+                        Записаться онлайн · {money(data.trialCrossSell.price)}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-3 text-2xl font-bold">Пока ничего не запланировано</p>
+                      <button
+                        className="miniapp-hero-button mt-5"
+                        onClick={() => setTab("schedule")}
+                      >
+                        Выбрать занятие
+                      </button>
+                    </>
+                  )
                 )}
               </div>
             </section>

@@ -130,6 +130,23 @@ export async function GET(req: NextRequest) {
         { id: "asc" },
       ],
     });
+    const trialVisits = await prisma.singleVisit.findMany({
+      where: { clientId: client.id, kind: "trial" },
+      select: { type: true },
+    });
+    const attendedTrialBookings = await prisma.botBooking.findMany({
+      where: {
+        clientId: client.id,
+        kind: "trial",
+        status: "confirmed",
+        lesson: {
+          attendances: {
+            some: { clientId: client.id, status: "present" },
+          },
+        },
+      },
+      select: { lesson: { select: { type: true } } },
+    });
     const settings = await getBotSettings();
     const bookingPayments = await prisma.botBooking.findMany({
       where: {
@@ -278,6 +295,47 @@ export async function GET(req: NextRequest) {
       })),
     ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
+    const availableLessons = lessons
+      .map((lesson) => {
+        const occupied =
+          lesson.attendances.filter(
+            (attendance) =>
+              attendance.clientId !== client.id ||
+              attendance.enrollmentSource !== "auto",
+          ).length + lesson.botBookings.length;
+        const free = lesson.capacity ? Math.max(0, lesson.capacity - occupied) : null;
+        return {
+          id: lesson.id,
+          title: lesson.title || "Групповое занятие",
+          type: lesson.type,
+          startsAt: lesson.startsAt.toISOString(),
+          free,
+          available: free === null || free > 0,
+        };
+      })
+      .filter((lesson) => lesson.available);
+    const attendedTrialTypes = new Set([
+      ...trialVisits.map((visit) => visit.type),
+      ...attendedTrialBookings.map((booking) => booking.lesson.type),
+    ]);
+    const onlineTrialPrice = prices.find(
+      (price) =>
+        price.kind === "trial" &&
+        price.type === "online" &&
+        price.format === "group",
+    );
+    const hasUpcomingOnlineTrial = bookings.some(
+      (booking) => booking.kind === "trial" && booking.lesson.type === "online",
+    );
+    const trialCrossSell =
+      attendedTrialTypes.has("offline") &&
+      !attendedTrialTypes.has("online") &&
+      !hasUpcomingOnlineTrial &&
+      onlineTrialPrice &&
+      availableLessons.some((lesson) => lesson.type === "online")
+        ? { priceItemId: onlineTrialPrice.id, price: onlineTrialPrice.price }
+        : null;
+
     return NextResponse.json({
       user: {
         firstName: user.first_name,
@@ -304,25 +362,7 @@ export async function GET(req: NextRequest) {
           (attendance) => attendance.plannedSubscriptionId === item.id,
         ).length,
       })),
-      lessons: lessons
-        .map((lesson) => {
-          const occupied =
-            lesson.attendances.filter(
-              (attendance) =>
-                attendance.clientId !== client.id ||
-                attendance.enrollmentSource !== "auto",
-            ).length + lesson.botBookings.length;
-          const free = lesson.capacity ? Math.max(0, lesson.capacity - occupied) : null;
-          return {
-            id: lesson.id,
-            title: lesson.title || "Групповое занятие",
-            type: lesson.type,
-            startsAt: lesson.startsAt.toISOString(),
-            free,
-            available: free === null || free > 0,
-          };
-        })
-        .filter((lesson) => lesson.available),
+      lessons: availableLessons,
       scheduledLessons: scheduledAttendances.map((attendance) => ({
         attendanceId: attendance.id,
         lessonId: attendance.lessonId,
@@ -355,6 +395,7 @@ export async function GET(req: NextRequest) {
         minLessons: item.kind === "subscription" ? (item.minLessons || 4) : 1,
         requiresLesson: item.kind !== "subscription" && item.format === "group",
       })),
+      trialCrossSell,
       preferences: {
         preferredType: fullClient.portalPreference?.preferredType || "both",
         preferredWeekdays: fullClient.portalPreference?.preferredWeekdays
