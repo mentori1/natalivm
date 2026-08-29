@@ -533,6 +533,18 @@ export function MiniApp() {
     setReceiptPreview(null);
   }
 
+  function chooseDateForCredit(credit: PortalData["bookingCredits"][number]) {
+    setType(credit.type);
+    setSelectedBookingPriceId(null);
+    setTab("schedule");
+    window.setTimeout(() => {
+      document.getElementById("miniapp-group-lessons")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  }
+
   const filteredLessons = useMemo(
     () => data?.lessons.filter((lesson) => lesson.type === type) || [],
     [data, type],
@@ -665,6 +677,19 @@ export function MiniApp() {
                       {nextBooking.type === "online" ? "Онлайн" : "Офлайн"} · {nextBooking.title}
                     </p>
                   </>
+                ) : data.bookingCredits.length ? (
+                  <>
+                    <p className="mt-3 text-2xl font-bold">Занятие ждёт новой даты</p>
+                    <p className="mt-2 text-sm leading-relaxed opacity-75">
+                      Оплаченное занятие сохранено в запасе до {formatDate(data.bookingCredits[0].expiresAt)}.
+                    </p>
+                    <button
+                      className="miniapp-hero-button mt-5"
+                      onClick={() => chooseDateForCredit(data.bookingCredits[0])}
+                    >
+                      Выбрать новую дату
+                    </button>
+                  </>
                 ) : (
                   data.trialCrossSell ? (
                     <>
@@ -726,10 +751,33 @@ export function MiniApp() {
                   Все тарифы
                 </button>
               </div>
-              {data.subscriptions.length ? (
+              {data.subscriptions.length || data.bookingCredits.length ? (
                 <div className="space-y-3">
                   {data.subscriptions.slice(0, 2).map((subscription) => (
                     <SubscriptionCard key={subscription.id} subscription={subscription} />
+                  ))}
+                  {data.bookingCredits.map((credit) => (
+                    <article key={`balance-credit-${credit.id}`} className="miniapp-credit-card">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="miniapp-type">В запасе</span>
+                          <span className="miniapp-type is-muted">
+                            {credit.type === "online" ? "Онлайн" : "Офлайн"}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-bold">{credit.title}</p>
+                        <p className="mt-1 text-sm opacity-60">
+                          1 занятие · использовать до {formatDate(credit.expiresAt)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="miniapp-small-button"
+                        onClick={() => chooseDateForCredit(credit)}
+                      >
+                        Выбрать дату
+                      </button>
+                    </article>
                   ))}
                 </div>
               ) : (
@@ -737,8 +785,13 @@ export function MiniApp() {
               )}
             </section>
 
-            <button className="miniapp-primary w-full" onClick={() => setTab("schedule")}>
-              Записаться на занятие
+            <button
+              className="miniapp-primary w-full"
+              onClick={() => data.bookingCredits[0]
+                ? chooseDateForCredit(data.bookingCredits[0])
+                : setTab("schedule")}
+            >
+              {data.bookingCredits.length ? "Выбрать дату для занятия" : "Записаться на занятие"}
             </button>
           </div>
         )}
@@ -970,15 +1023,7 @@ export function MiniApp() {
                       <button
                         type="button"
                         className="miniapp-small-button"
-                        onClick={() => {
-                          setType(credit.type);
-                          window.requestAnimationFrame(() => {
-                            document.getElementById("miniapp-group-lessons")?.scrollIntoView({
-                              behavior: "smooth",
-                              block: "start",
-                            });
-                          });
-                        }}
+                        onClick={() => chooseDateForCredit(credit)}
                       >
                         Выбрать дату
                       </button>
