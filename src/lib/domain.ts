@@ -394,6 +394,11 @@ export const SINGLE_VISIT_PRICE: Record<string, Record<string, number>> = {
 /// поэтому старые продажи остаются по своей сумме и не пересчитываются.
 export const TRAINER_PROFIT_DEFAULT = 5000;
 
+/// Текущая цена продажи тренажёра клиентке, ₽.
+/// В истории сохраняется TrainerOrder.amount, поэтому будущая смена цены
+/// не влияет на уже созданные заявки и подтверждённые покупки.
+export const TRAINER_PRICE_DEFAULT = 12000;
+
 /// Готовые категории расходов (можно выбрать или вписать свою)
 export const EXPENSE_CATEGORIES = [
   "Аренда зала",

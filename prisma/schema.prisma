@@ -46,6 +46,7 @@ model Client {
   portalPreference      ClientPortalPreference?
   portalLinks           ClientPortalLink[]
   subscriptionOrders    SubscriptionOrder[]
+  trainerOrders         TrainerOrder[]
 }
 
 /// Предпочтения клиентки в личном кабинете Mini App.
@@ -162,6 +163,29 @@ model SubscriptionOrder {
   reviewedAt           DateTime?
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
+
+  @@index([clientId, status])
+  @@index([telegramUserId, status])
+}
+
+/// Заявка на покупку тренажёра из Mini App.
+/// Цена продажи и прибыль преподавателя фиксируются в момент заявки.
+model TrainerOrder {
+  id                   Int      @id @default(autoincrement())
+  clientId             Int
+  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  telegramChatId       String
+  telegramUserId       String
+  amount               Int
+  profit               Int
+  status               String   @default("awaiting_receipt") // awaiting_receipt | review | confirmed | rejected | cancelled
+  receiptFileId        String?
+  receiptFileName      String?
+  receiptMimeType      String?
+  reviewedByTelegramId String?
+  reviewedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([clientId, status])
   @@index([telegramUserId, status])

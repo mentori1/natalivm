@@ -179,3 +179,57 @@ export async function rejectSubscriptionPayment(
   });
   return order;
 }
+
+export async function approveTrainerPayment(
+  orderId: number,
+  adminTelegramId: string,
+) {
+  const now = new Date();
+  const result = await prisma.$transaction(async (tx) => {
+    const order = await tx.trainerOrder.findUnique({ where: { id: orderId } });
+    if (!order || order.status !== "review") return null;
+
+    await tx.trainerOrder.update({
+      where: { id: order.id },
+      data: {
+        status: "confirmed",
+        reviewedByTelegramId: adminTelegramId,
+        reviewedAt: now,
+      },
+    });
+    await tx.client.update({
+      where: { id: order.clientId },
+      data: {
+        hasTrainer: true,
+        trainerPurchasedAt: now,
+        trainerProfit: order.profit,
+      },
+    });
+    return order;
+  });
+  if (result) return { ok: true as const, order: result };
+
+  const existing = await prisma.trainerOrder.findUnique({ where: { id: orderId } });
+  return {
+    ok: false as const,
+    reason: existing?.status === "confirmed" ? "already" as const : "changed" as const,
+    order: existing,
+  };
+}
+
+export async function rejectTrainerPayment(
+  orderId: number,
+  adminTelegramId: string,
+) {
+  const order = await prisma.trainerOrder.findUnique({ where: { id: orderId } });
+  if (!order || order.status !== "review") return null;
+  await prisma.trainerOrder.update({
+    where: { id: orderId },
+    data: {
+      status: "rejected",
+      reviewedByTelegramId: adminTelegramId,
+      reviewedAt: new Date(),
+    },
+  });
+  return order;
+}

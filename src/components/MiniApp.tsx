@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 type Tab = "home" | "schedule" | "subscriptions" | "trainer" | "profile" | "payments" | "admin";
 type LessonType = "online" | "offline";
 type Payment = {
-  kind: "booking" | "subscription";
+  kind: "booking" | "subscription" | "trainer";
   id: number;
   title: string;
   detail: string;
@@ -77,7 +77,13 @@ type PortalData = {
   isAdmin: boolean;
   adminPayments: Payment[];
   adminPendingCount: number;
-  trainer: { text: string; imageUrl: string };
+  trainer: {
+    text: string;
+    imageUrl: string;
+    hasTrainer: boolean;
+    price: number;
+    orderStatus: string | null;
+  };
   generatedAt: string;
 };
 
@@ -369,6 +375,12 @@ export function MiniApp() {
   const filteredAdminPayments = data?.adminPayments.filter(
     (payment) => payment.status === adminFilter,
   ) || [];
+  const trainerSummary = data?.trainer.text
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter((part) => part && !/^🌊?\s*Тренаж[её]р/i.test(part))
+    .slice(0, 2)
+    .join("\n\n");
 
   if (loading) {
     return (
@@ -1065,7 +1077,52 @@ export function MiniApp() {
               <img src={data.trainer.imageUrl} alt="Тренажёр Волна" />
             </div>
             <div className="miniapp-trainer-copy mt-4 whitespace-pre-line">
-              {data.trainer.text}
+              {trainerSummary || data.trainer.text}
+            </div>
+            <div className="miniapp-trainer-offer mt-4">
+              {data.trainer.hasTrainer ? (
+                <div className="miniapp-trainer-owned">
+                  <span aria-hidden="true">✓</span>
+                  <div>
+                    <p className="font-bold">Тренажёр уже куплен</p>
+                    <p className="mt-1 text-sm opacity-60">Покупка отмечена в вашей карточке CRM.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase opacity-50">Стоимость</p>
+                      <p className="mt-1 text-2xl font-extrabold">{money(data.trainer.price)}</p>
+                    </div>
+                    {data.trainer.orderStatus === "review" && (
+                      <span className="miniapp-payment-status is-review">Чек на проверке</span>
+                    )}
+                  </div>
+                  <button
+                    disabled={busy}
+                    className="miniapp-primary mt-4 w-full"
+                    onClick={() => {
+                      if (data.trainer.orderStatus) {
+                        setTab("payments");
+                        return;
+                      }
+                      void action(
+                        { action: "buyTrainer" },
+                        { openPaymentsWhenRequired: true },
+                      );
+                    }}
+                  >
+                    {data.trainer.orderStatus === "review"
+                      ? "Посмотреть статус оплаты"
+                      : data.trainer.orderStatus === "rejected"
+                        ? "Загрузить новый чек"
+                        : data.trainer.orderStatus === "awaiting_receipt"
+                          ? "Перейти к оплате"
+                          : `Купить · ${money(data.trainer.price)}`}
+                  </button>
+                </>
+              )}
             </div>
           </section>
         )}

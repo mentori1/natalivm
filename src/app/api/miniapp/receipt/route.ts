@@ -13,7 +13,7 @@ import { syncTelegramClient } from "@/lib/telegram-client-sync";
 
 export const dynamic = "force-dynamic";
 
-type PaymentKind = "booking" | "subscription";
+type PaymentKind = "booking" | "subscription" | "trainer";
 
 function identity(req: NextRequest) {
   return validateTelegramMiniAppData(
@@ -22,7 +22,7 @@ function identity(req: NextRequest) {
 }
 
 function paymentKind(value: FormDataEntryValue | string | null): PaymentKind {
-  if (value === "booking" || value === "subscription") return value;
+  if (value === "booking" || value === "subscription" || value === "trainer") return value;
   throw new Error("Платёж не выбран");
 }
 
@@ -61,7 +61,17 @@ export async function GET(req: NextRequest) {
             receiptMimeType: true,
           },
         })
-      : await prisma.subscriptionOrder.findUnique({
+      : kind === "subscription"
+        ? await prisma.subscriptionOrder.findUnique({
+            where: { id },
+            select: {
+              clientId: true,
+              receiptFileId: true,
+              receiptFileName: true,
+              receiptMimeType: true,
+            },
+          })
+        : await prisma.trainerOrder.findUnique({
           where: { id },
           select: {
             clientId: true,
@@ -130,7 +140,16 @@ export async function POST(req: NextRequest) {
           },
         })
       : null;
-    if (!booking && !order) {
+    const trainerOrder = kind === "trainer"
+      ? await prisma.trainerOrder.findFirst({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+        })
+      : null;
+    if (!booking && !order && !trainerOrder) {
       throw new Error("Этот платёж уже отправлен или больше не действует");
     }
     if (booking && booking.lesson.startsAt <= now) {
@@ -143,11 +162,17 @@ export async function POST(req: NextRequest) {
     const isTelegramPhoto = ["image/jpeg", "image/png"].includes(mimeType);
     const method = isTelegramPhoto ? "sendPhoto" : "sendDocument";
     const field = isTelegramPhoto ? "photo" : "document";
-    const callbackPrefix = kind === "booking" ? "" : "-sub";
+    const callbackPrefix = kind === "booking"
+      ? ""
+      : kind === "subscription"
+        ? "-sub"
+        : "-trainer";
     const title = booking
       ? `${booking.displayName || client.fullName}\n${booking.lesson.type === "online" ? "Онлайн" : "Офлайн"} · ${booking.tariffName || "Занятие"}`
-      : `${client.fullName}\n${order!.tariffName} · ${order!.totalLessons} занятий`;
-    const amount = booking?.amount ?? order!.amount;
+      : order
+        ? `${client.fullName}\n${order.tariffName} · ${order.totalLessons} занятий`
+        : `${client.fullName}\nТренажёр «Волна»`;
+    const amount = booking?.amount ?? order?.amount ?? trainerOrder!.amount;
     const caption =
       `Проверка оплаты №${id}\n\n${title}\n${amount.toLocaleString("ru-RU")} ₽`;
     const replyMarkup = {
@@ -193,9 +218,21 @@ export async function POST(req: NextRequest) {
           reviewedByTelegramId: null,
         },
       });
-    } else {
+    } else if (order) {
       await prisma.subscriptionOrder.update({
-        where: { id: order!.id },
+        where: { id: order.id },
+        data: {
+          status: "review",
+          receiptFileId,
+          receiptFileName: receipt.name || "Чек",
+          receiptMimeType: mimeType,
+          reviewedAt: null,
+          reviewedByTelegramId: null,
+        },
+      });
+    } else {
+      await prisma.trainerOrder.update({
+        where: { id: trainerOrder!.id },
         data: {
           status: "review",
           receiptFileId,

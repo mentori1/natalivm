@@ -13,8 +13,10 @@ import { ensureDefaultPriceItems } from "@/lib/prices";
 import {
   approveBookingPayment,
   approveSubscriptionPayment,
+  approveTrainerPayment,
   rejectBookingPayment,
   rejectSubscriptionPayment,
+  rejectTrainerPayment,
 } from "@/lib/payment-review";
 import {
   bindClientWithPortalToken,
@@ -1088,6 +1090,52 @@ async function rejectSubscriptionOrder(
   }
 }
 
+async function approveTrainerOrder(
+  query: TelegramCallbackQuery,
+  orderId: number,
+) {
+  const adminId = String(query.from.id);
+  if (!telegramAdminIds().has(adminId)) {
+    await answerCallback(query.id, "Нет доступа", true);
+    return;
+  }
+  const result = await approveTrainerPayment(orderId, adminId);
+  if (!result.ok) {
+    await answerCallback(query.id, "Заявка уже обработана", true);
+    return;
+  }
+  await editCallbackButtons(query);
+  await answerCallback(query.id, "Покупка подтверждена");
+  await replaceScreen(
+    result.order.telegramChatId,
+    "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+  );
+}
+
+async function rejectTrainerOrder(
+  query: TelegramCallbackQuery,
+  orderId: number,
+) {
+  const adminId = String(query.from.id);
+  if (!telegramAdminIds().has(adminId)) {
+    await answerCallback(query.id, "Нет доступа", true);
+    return;
+  }
+  const order = await rejectTrainerPayment(orderId, adminId);
+  await editCallbackButtons(query);
+  await answerCallback(
+    query.id,
+    order ? "Чек отклонён" : "Заявка уже обработана",
+    !order,
+  );
+  if (order) {
+    await replaceScreen(
+      order.telegramChatId,
+      "Платёж пока не подтверждён. Проверьте чек и отправьте корректный PDF или фотографию ещё раз.",
+    );
+  }
+}
+
 export async function handleClientBotMessage(message: TelegramMessage) {
   const chatId = String(message.chat.id);
   if (message.chat.type !== "private") return;
@@ -1248,6 +1296,16 @@ export async function handleClientBotCallback(query: TelegramCallbackQuery) {
   if (data.startsWith("admin:reject-sub:")) {
     const id = Number(data.slice("admin:reject-sub:".length));
     if (Number.isInteger(id)) await rejectSubscriptionOrder(query, id);
+    return;
+  }
+  if (data.startsWith("admin:approve-trainer:")) {
+    const id = Number(data.slice("admin:approve-trainer:".length));
+    if (Number.isInteger(id)) await approveTrainerOrder(query, id);
+    return;
+  }
+  if (data.startsWith("admin:reject-trainer:")) {
+    const id = Number(data.slice("admin:reject-trainer:".length));
+    if (Number.isInteger(id)) await rejectTrainerOrder(query, id);
     return;
   }
   await answerCallback(query.id);

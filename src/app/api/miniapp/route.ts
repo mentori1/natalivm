@@ -5,13 +5,17 @@ import {
   derivedSubStatus,
   formatDateTime,
   remaining,
+  TRAINER_PRICE_DEFAULT,
+  TRAINER_PROFIT_DEFAULT,
 } from "@/lib/domain";
 import { DEFAULT_BOT_TEXT, getBotSettings } from "@/lib/bot-settings";
 import {
   approveBookingPayment,
   approveSubscriptionPayment,
+  approveTrainerPayment,
   rejectBookingPayment,
   rejectSubscriptionPayment,
+  rejectTrainerPayment,
 } from "@/lib/payment-review";
 import { ensureDefaultPriceItems } from "@/lib/prices";
 import { createBooking } from "@/lib/telegram-client-bot";
@@ -31,7 +35,7 @@ import {
 export const dynamic = "force-dynamic";
 
 type PortalPayment = {
-  kind: "booking" | "subscription";
+  kind: "booking" | "subscription" | "trainer";
   id: number;
   title: string;
   detail: string;
@@ -145,6 +149,14 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+    const trainerPayments = await prisma.trainerOrder.findMany({
+      where: {
+        clientId: client.id,
+        status: { not: "cancelled" },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
     const payments: PortalPayment[] = [
       ...bookingPayments.map((item) => ({
         kind: "booking" as const,
@@ -164,6 +176,19 @@ export async function GET(req: NextRequest) {
         id: item.id,
         title: item.tariffName,
         detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+        amount: item.amount,
+        status: item.status,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        hasReceipt: Boolean(item.receiptFileId),
+        receiptName: item.receiptFileName,
+        receiptMimeType: item.receiptMimeType,
+      })),
+      ...trainerPayments.map((item) => ({
+        kind: "trainer" as const,
+        id: item.id,
+        title: "Тренажёр «Волна»",
+        detail: "Покупка тренажёра",
         amount: item.amount,
         status: item.status,
         createdAt: item.createdAt.toISOString(),
@@ -197,6 +222,17 @@ export async function GET(req: NextRequest) {
           take: 100,
         })
       : [];
+    const adminTrainerPayments = isAdmin
+      ? await prisma.trainerOrder.findMany({
+          where: {
+            receiptFileId: { not: null },
+            status: { in: ["review", "confirmed", "rejected"] },
+          },
+          include: { client: true },
+          orderBy: { updatedAt: "desc" },
+          take: 100,
+        })
+      : [];
     const adminPayments: PortalPayment[] = [
       ...adminBookingPayments.map((item) => ({
         kind: "booking" as const,
@@ -217,6 +253,20 @@ export async function GET(req: NextRequest) {
         id: item.id,
         title: item.tariffName,
         detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+        amount: item.amount,
+        status: item.status,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        hasReceipt: true,
+        receiptName: item.receiptFileName,
+        receiptMimeType: item.receiptMimeType,
+        clientName: item.client.fullName,
+      })),
+      ...adminTrainerPayments.map((item) => ({
+        kind: "trainer" as const,
+        id: item.id,
+        title: "Тренажёр «Волна»",
+        detail: "Покупка тренажёра",
         amount: item.amount,
         status: item.status,
         createdAt: item.createdAt.toISOString(),
@@ -319,7 +369,12 @@ export async function GET(req: NextRequest) {
       adminPendingCount: adminPayments.filter((item) => item.status === "review").length,
       trainer: {
         text: settings.trainerText || DEFAULT_BOT_TEXT.trainer,
-        imageUrl: "/bot-trainer.jpg",
+        imageUrl: "/miniapp-trainer-product.jpg",
+        hasTrainer: fullClient.hasTrainer,
+        price: TRAINER_PRICE_DEFAULT,
+        orderStatus: trainerPayments.find((item) =>
+          ["awaiting_receipt", "review", "rejected"].includes(item.status)
+        )?.status || null,
       },
       generatedAt: new Date().toISOString(),
     });
@@ -338,7 +393,7 @@ export async function POST(req: NextRequest) {
       preferredWeekdays?: number[];
       priceItemId?: number;
       totalLessons?: number;
-      paymentKind?: "booking" | "subscription";
+      paymentKind?: "booking" | "subscription" | "trainer";
       paymentId?: number;
       decision?: "approve" | "reject";
       attendanceId?: number;
@@ -463,6 +518,26 @@ export async function POST(req: NextRequest) {
         ).catch(() => undefined);
         return NextResponse.json({ ok: true, message: "Чек отклонён" });
       }
+
+      if (body.paymentKind === "trainer" && body.decision === "approve") {
+        const result = await approveTrainerPayment(id, adminId);
+        if (!result.ok) throw new Error("Платёж уже обработан");
+        await sendTelegramMessage(
+          result.order.telegramChatId,
+          "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+        ).catch(() => undefined);
+        return NextResponse.json({ ok: true, message: "Покупка тренажёра подтверждена" });
+      }
+
+      if (body.paymentKind === "trainer" && body.decision === "reject") {
+        const order = await rejectTrainerPayment(id, adminId);
+        if (!order) throw new Error("Платёж уже обработан");
+        await sendTelegramMessage(
+          order.telegramChatId,
+          "Чек отклонён. Загрузите корректную фотографию или PDF в личном кабинете.",
+        ).catch(() => undefined);
+        return NextResponse.json({ ok: true, message: "Чек отклонён" });
+      }
     }
 
     if (body.action === "book") {
@@ -512,6 +587,45 @@ export async function POST(req: NextRequest) {
         },
       });
       return NextResponse.json({ ok: true, message: "Удобные дни сохранены" });
+    }
+
+    if (body.action === "buyTrainer") {
+      const currentClient = await prisma.client.findUniqueOrThrow({
+        where: { id: client.id },
+        select: { hasTrainer: true },
+      });
+      if (currentClient.hasTrainer) {
+        throw new Error("Тренажёр уже отмечен как купленный");
+      }
+      const settings = await getBotSettings();
+      if (!settings.paymentDetails) {
+        throw new Error("Реквизиты для оплаты пока не заполнены");
+      }
+      const existing = await prisma.trainerOrder.findFirst({
+        where: {
+          clientId: client.id,
+          status: { in: ["awaiting_receipt", "review", "rejected"] },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!existing) {
+        await prisma.trainerOrder.create({
+          data: {
+            clientId: client.id,
+            telegramChatId: String(user.id),
+            telegramUserId: String(user.id),
+            amount: TRAINER_PRICE_DEFAULT,
+            profit: TRAINER_PROFIT_DEFAULT,
+          },
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        paymentRequired: true,
+        message: existing?.status === "review"
+          ? "Чек уже находится на проверке"
+          : "Заявка создана. Оплатите и прикрепите чек в личном кабинете.",
+      });
     }
 
     if (body.action === "subscription") {
