@@ -227,6 +227,7 @@ export function MiniApp() {
       const result = (await response.json()) as PortalData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Не удалось открыть кабинет");
       setData(result);
+      if (result.isAdmin) setTab("admin");
       setWeekdays(result.preferences.preferredWeekdays);
       setPreferredType(result.preferences.preferredType);
       setLessonCounts(
@@ -410,7 +411,7 @@ export function MiniApp() {
   }
 
   return (
-    <main className="miniapp-shell min-h-[100dvh] pb-28">
+    <main className={`miniapp-shell min-h-[100dvh] ${data.isAdmin ? "pb-8" : "pb-28"}`}>
       <header className="px-5 pb-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -421,10 +422,10 @@ export function MiniApp() {
           </div>
           <div className="flex items-center gap-2">
             {data.isAdmin && (
-              <button className="miniapp-admin-shortcut" onClick={() => setTab("admin")}>
-                Платежи
+              <span className="miniapp-admin-shortcut">
+                Администратор
                 {data.adminPendingCount > 0 && <strong>{data.adminPendingCount}</strong>}
-              </button>
+              </span>
             )}
             <div className="miniapp-avatar">
               {data.user.photoUrl ? (
@@ -1181,20 +1182,22 @@ export function MiniApp() {
         )}
       </div>
 
-      <nav className="miniapp-nav" aria-label="Разделы личного кабинета">
-        {([
-          ["home", "Главная", "⌂"],
-          ["schedule", "Запись", "◷"],
-          ["subscriptions", "Абонемент", "◇"],
-          ["trainer", "Тренажёр", "∿"],
-          ["profile", "Профиль", "○"],
-        ] as Array<[Tab, string, string]>).map(([value, label, icon]) => (
-          <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>
-            <span aria-hidden="true">{icon}</span>
-            <small>{label}</small>
-          </button>
-        ))}
-      </nav>
+      {!data.isAdmin && (
+        <nav className="miniapp-nav" aria-label="Разделы личного кабинета">
+          {([
+            ["home", "Главная", "⌂"],
+            ["schedule", "Запись", "◷"],
+            ["subscriptions", "Абонемент", "◇"],
+            ["trainer", "Тренажёр", "∿"],
+            ["profile", "Профиль", "○"],
+          ] as Array<[Tab, string, string]>).map(([value, label, icon]) => (
+            <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>
+              <span aria-hidden="true">{icon}</span>
+              <small>{label}</small>
+            </button>
+          ))}
+        </nav>
+      )}
 
       {receiptPreview && (
         <div className="miniapp-receipt-modal" role="dialog" aria-modal="true">
