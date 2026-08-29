@@ -271,7 +271,7 @@ function channelUrl(chatId: string | null, configuredUrl: string | null) {
   return null;
 }
 
-async function hasRequiredSubscription(userId: string) {
+export async function hasRequiredSubscription(userId: string) {
   const settings = await getBotSettings();
   if (!settings.requiredChannelChatId) return true;
   try {
@@ -310,7 +310,7 @@ async function askForSubscription(chatId: string) {
   );
 }
 
-async function requireSubscription(chatId: string, userId: string) {
+export async function requireSubscription(chatId: string, userId: string) {
   if (await hasRequiredSubscription(userId)) return true;
   await askForSubscription(chatId);
   return false;

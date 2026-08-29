@@ -18,7 +18,7 @@ import {
   rejectTrainerPayment,
 } from "@/lib/payment-review";
 import { ensureDefaultPriceItems } from "@/lib/prices";
-import { createBooking } from "@/lib/telegram-client-bot";
+import { createBooking, requireSubscription } from "@/lib/telegram-client-bot";
 import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import {
@@ -442,6 +442,13 @@ export async function POST(req: NextRequest) {
       subscriptionId?: number;
       startsAt?: string;
     };
+
+    if (["book", "purchaseTariff"].includes(body.action || "")) {
+      const subscribed = await requireSubscription(String(user.id), String(user.id));
+      if (!subscribed) {
+        throw new Error("Сначала подпишитесь на канал @VUMEXCLUSIVE и повторите действие");
+      }
+    }
 
     if (body.action === "scheduleIndividual") {
       const subscriptionId = Number(body.subscriptionId);

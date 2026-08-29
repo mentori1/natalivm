@@ -60,6 +60,7 @@ async function main() {
         allowed_updates: [
           "message",
           "channel_post",
+          "chat_member",
           "business_connection",
           "business_message",
           "edited_business_message",

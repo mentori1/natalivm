@@ -4,6 +4,7 @@ import { basename } from "node:path";
 
 export type TelegramUser = {
   id: number;
+  is_bot?: boolean;
   first_name: string;
   last_name?: string;
   username?: string;
@@ -64,6 +65,20 @@ export type TelegramBusinessConnectionUpdate = {
   is_enabled: boolean;
 };
 
+export type TelegramChatMember = {
+  status: string;
+  user: TelegramUser;
+  is_member?: boolean;
+};
+
+export type TelegramChatMemberUpdated = {
+  chat: TelegramChat;
+  from: TelegramUser;
+  date: number;
+  old_chat_member: TelegramChatMember;
+  new_chat_member: TelegramChatMember;
+};
+
 export type TelegramUpdate = {
   update_id: number;
   message?: TelegramMessage;
@@ -71,6 +86,7 @@ export type TelegramUpdate = {
   business_connection?: TelegramBusinessConnectionUpdate;
   business_message?: TelegramMessage;
   callback_query?: TelegramCallbackQuery;
+  chat_member?: TelegramChatMemberUpdated;
 };
 
 type TelegramApiResponse<T> = {

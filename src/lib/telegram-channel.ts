@@ -1,12 +1,16 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getBotCopy } from "@/lib/bot-content";
+import { getBotSettings } from "@/lib/bot-settings";
 import { prisma } from "@/lib/db";
 import {
   sendTelegramMessage,
   setTelegramProfilePhotoFile,
   telegramAdminIds,
   telegramApi,
+  telegramDisplayName,
+  type TelegramChatMember,
+  type TelegramChatMemberUpdated,
   type TelegramMessage,
 } from "@/lib/telegram-api";
 
@@ -21,6 +25,52 @@ async function notifyAdmins(text: string) {
   for (const chatId of telegramAdminIds()) {
     await sendTelegramMessage(chatId, text).catch(() => undefined);
   }
+}
+
+function isChannelMember(member: TelegramChatMember) {
+  if (["left", "kicked"].includes(member.status)) return false;
+  if (member.status === "restricted") return member.is_member !== false;
+  return true;
+}
+
+function isRequiredChannel(
+  configuredChannel: string,
+  update: TelegramChatMemberUpdated,
+) {
+  const configured = configuredChannel.trim().toLowerCase();
+  const numericId = String(update.chat.id);
+  const username = update.chat.username?.trim().toLowerCase();
+  return configured === numericId || Boolean(username && configured === `@${username}`);
+}
+
+export async function handleRequiredChannelMemberUpdate(
+  update: TelegramChatMemberUpdated,
+) {
+  const settings = await getBotSettings();
+  if (
+    !settings.requiredChannelChatId ||
+    !isRequiredChannel(settings.requiredChannelChatId, update)
+  ) {
+    return;
+  }
+
+  const wasMember = isChannelMember(update.old_chat_member);
+  const isMember = isChannelMember(update.new_chat_member);
+  const user = update.new_chat_member.user;
+  if (wasMember === isMember || user.is_bot) return;
+
+  const name = telegramDisplayName(user) || "Имя не указано";
+  const username = user.username ? `@${user.username}` : "не указан";
+  await notifyAdmins(
+    [
+      isMember
+        ? "Новый подписчик канала @VUMEXCLUSIVE"
+        : "Отписка от канала @VUMEXCLUSIVE",
+      `Имя: ${name}`,
+      `Username: ${username}`,
+      `Telegram ID: ${user.id}`,
+    ].join("\n"),
+  );
 }
 
 export async function syncTelegramBotProfile() {

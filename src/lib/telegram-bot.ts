@@ -19,7 +19,10 @@ import {
   handleClientBotMessage,
   runClientBookingReminders,
 } from "@/lib/telegram-client-bot";
-import { handleTelegramChannelPost } from "@/lib/telegram-channel";
+import {
+  handleRequiredChannelMemberUpdate,
+  handleTelegramChannelPost,
+} from "@/lib/telegram-channel";
 
 export type { TelegramUpdate } from "@/lib/telegram-api";
 export { telegramApi } from "@/lib/telegram-api";
@@ -499,6 +502,9 @@ async function processUpdate(update: TelegramUpdate) {
     await handleClientBotMessage(update.message);
   }
   if (update.channel_post) await handleTelegramChannelPost(update.channel_post);
+  if (update.chat_member) {
+    await handleRequiredChannelMemberUpdate(update.chat_member);
+  }
   if (update.business_message) await handleBusinessMessage(update.business_message);
   if (update.callback_query?.message?.business_connection_id) {
     await handleCallback(update.callback_query);
