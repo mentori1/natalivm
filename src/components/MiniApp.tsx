@@ -267,6 +267,12 @@ export function MiniApp() {
     MINIAPP_NAV.findIndex(([value]) => value === activeNavTab),
   );
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 3200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   function measuredLens(index: number, pointerX?: number): NavLens | null {
     const nav = miniNavRef.current;
     const button = miniNavButtonRefs.current[index];
@@ -607,10 +613,19 @@ export function MiniApp() {
         </div>
       </header>
 
-      {(error || notice) && (
-        <div className={`miniapp-alert mx-5 mb-4 ${error ? "is-error" : ""}`}>
-          {error || notice}
-        </div>
+      {error && (
+        <div className="miniapp-alert is-error mx-5 mb-4">{error}</div>
+      )}
+      {notice && (
+        <button
+          type="button"
+          className="miniapp-alert is-notice mx-5 mb-4 text-left"
+          onClick={() => setNotice("")}
+          aria-label="Закрыть уведомление"
+        >
+          <span>{notice}</span>
+          <b aria-hidden="true">×</b>
+        </button>
       )}
 
       <div className="px-5">
@@ -822,46 +837,73 @@ export function MiniApp() {
                     )}
 
                     {lesson.format === "group" && (
-                      <div className="miniapp-reschedule-box mt-4">
+                      <div className="mt-4">
                         {targets.length ? (
-                          <>
-                            <p className="font-bold">Перенести запись</p>
-                            <p className="mt-1 text-xs leading-relaxed opacity-55">
-                              Выберите, на какую новую дату перенести занятие. Списания не будет.
-                            </p>
-                            <label className="mt-3">Куда перенести</label>
-                            <select
-                              value={selectedTarget || ""}
-                              onChange={(event) => setTransferTargets((old) => ({
-                                ...old,
-                                [lesson.attendanceId]: Number(event.target.value),
-                              }))}
-                            >
-                              <option value="">Выберите новую дату и время</option>
-                              {targets.map((target) => (
-                                <option key={target.id} value={target.id}>
-                                  {formatScheduleDate(target.startsAt)}
-                                </option>
-                              ))}
-                            </select>
+                          editingLesson === lesson.attendanceId ? (
+                            <div className="miniapp-reschedule-box">
+                              <p className="font-bold">Куда перенести</p>
+                              <p className="mt-1 text-xs leading-relaxed opacity-55">
+                                Выберите новую дату и время. Списания не будет.
+                              </p>
+                              <select
+                                className="mt-3"
+                                value={selectedTarget || ""}
+                                onChange={(event) => setTransferTargets((old) => ({
+                                  ...old,
+                                  [lesson.attendanceId]: Number(event.target.value),
+                                }))}
+                              >
+                                <option value="">Выберите новую дату и время</option>
+                                {targets.map((target) => (
+                                  <option key={target.id} value={target.id}>
+                                    {formatScheduleDate(target.startsAt)}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  className="miniapp-decline-button"
+                                  onClick={() => setEditingLesson(null)}
+                                >
+                                  Закрыть
+                                </button>
+                                <button
+                                  disabled={busy || !selectedTarget}
+                                  className="miniapp-approve-button"
+                                  onClick={() => {
+                                    if (window.confirm("Перенести запись на выбранное занятие?")) {
+                                      void action({
+                                        action: "transferGroup",
+                                        attendanceId: lesson.attendanceId,
+                                        targetLessonId: selectedTarget,
+                                      }).then((result) => {
+                                        if (result) {
+                                          setEditingLesson(null);
+                                          setTransferTargets((old) => ({
+                                            ...old,
+                                            [lesson.attendanceId]: 0,
+                                          }));
+                                        }
+                                      });
+                                    }
+                                  }}
+                                >
+                                  Перенести
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
                             <button
-                              disabled={busy || !selectedTarget}
-                              className="miniapp-receipt-button mt-2 w-full"
-                              onClick={() => {
-                                if (window.confirm("Перенести запись на выбранное занятие?")) {
-                                  void action({
-                                    action: "transferGroup",
-                                    attendanceId: lesson.attendanceId,
-                                    targetLessonId: selectedTarget,
-                                  });
-                                }
-                              }}
+                              type="button"
+                              className="miniapp-glass-pill"
+                              onClick={() => setEditingLesson(lesson.attendanceId)}
                             >
-                              {selectedTarget ? "Перенести на выбранную дату" : "Сначала выберите дату"}
+                              Перенести запись
                             </button>
-                          </>
+                          )
                         ) : (
-                          <p className="text-sm opacity-55">Других доступных дат пока нет.</p>
+                          <span className="miniapp-glass-pill is-disabled">Других дат пока нет</span>
                         )}
                       </div>
                     )}
@@ -1340,8 +1382,8 @@ export function MiniApp() {
             <div className="miniapp-trainer-copy mt-4 whitespace-pre-line">
               {trainerSummary || data.trainer.text}
             </div>
-            <div className="miniapp-trainer-offer mt-4">
-              {data.trainer.hasTrainer ? (
+            {data.trainer.hasTrainer ? (
+              <div className="miniapp-trainer-offer mt-4">
                 <div className="miniapp-trainer-owned">
                   <span aria-hidden="true">✓</span>
                   <div>
@@ -1349,42 +1391,31 @@ export function MiniApp() {
                     <p className="mt-1 text-sm opacity-60">Покупка отмечена в вашей карточке CRM.</p>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-end justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-bold uppercase opacity-50">Стоимость</p>
-                      <p className="mt-1 text-2xl font-extrabold">{money(data.trainer.price)}</p>
-                    </div>
-                    {data.trainer.orderStatus === "review" && (
-                      <span className="miniapp-payment-status is-review">Чек на проверке</span>
-                    )}
-                  </div>
-                  <button
-                    disabled={busy}
-                    className="miniapp-primary mt-4 w-full"
-                    onClick={() => {
-                      if (data.trainer.orderStatus) {
-                        setTab("payments");
-                        return;
-                      }
-                      void action(
-                        { action: "buyTrainer" },
-                        { openPaymentsWhenRequired: true },
-                      );
-                    }}
-                  >
-                    {data.trainer.orderStatus === "review"
-                      ? "Посмотреть статус оплаты"
-                      : data.trainer.orderStatus === "rejected"
-                        ? "Загрузить новый чек"
-                        : data.trainer.orderStatus === "awaiting_receipt"
-                          ? "Перейти к оплате"
-                          : `Купить · ${money(data.trainer.price)}`}
-                  </button>
-                </>
-              )}
-            </div>
+              </div>
+            ) : (
+              <button
+                disabled={busy}
+                className="miniapp-primary mt-3 w-full"
+                onClick={() => {
+                  if (data.trainer.orderStatus) {
+                    setTab("payments");
+                    return;
+                  }
+                  void action(
+                    { action: "buyTrainer" },
+                    { openPaymentsWhenRequired: true },
+                  );
+                }}
+              >
+                {data.trainer.orderStatus === "review"
+                  ? "Посмотреть статус оплаты"
+                  : data.trainer.orderStatus === "rejected"
+                    ? "Загрузить новый чек"
+                    : data.trainer.orderStatus === "awaiting_receipt"
+                      ? "Перейти к оплате"
+                      : `Купить · ${money(data.trainer.price)}`}
+              </button>
+            )}
           </section>
         )}
       </div>
