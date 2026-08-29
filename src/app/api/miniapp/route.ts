@@ -427,7 +427,7 @@ export async function GET(req: NextRequest) {
       adminPendingCount: adminPayments.filter((item) => item.status === "review").length,
       trainer: {
         text: settings.trainerText || DEFAULT_BOT_TEXT.trainer,
-        imageUrl: "/miniapp-trainer-product.jpg",
+        imageUrl: "/miniapp-trainer-product-fast.jpg",
         hasTrainer: fullClient.hasTrainer,
         price: TRAINER_PRICE_DEFAULT,
         orderStatus: trainerPayments.find((item) =>

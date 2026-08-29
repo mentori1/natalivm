@@ -31,8 +31,14 @@ const requiredTables = [
   "botBooking",
 ];
 
-function ids(rows: Row[]) {
-  return new Set(rows.map((row) => String(row.id)));
+const primaryKey: Record<string, string> = {
+  botSession: "telegramChatId",
+  botContent: "key",
+  botChannel: "telegramChatId",
+};
+
+function ids(rows: Row[], field = "id") {
+  return new Set(rows.map((row) => String(row[field])));
 }
 
 function main() {
@@ -50,7 +56,10 @@ function main() {
       failures.push(`нет таблицы ${table}`);
       continue;
     }
-    if (ids(rows).size !== rows.length) failures.push(`повторяются id в ${table}`);
+    const key = primaryKey[table] || "id";
+    if (ids(rows, key).size !== rows.length) {
+      failures.push(`повторяются ${key} в ${table}`);
+    }
     if (backup.counts?.[table] !== rows.length) {
       failures.push(`не совпадает count для ${table}`);
     }

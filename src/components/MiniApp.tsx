@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 type Tab = "home" | "schedule" | "subscriptions" | "trainer" | "profile" | "payments" | "admin";
 type LessonType = "online" | "offline";
+type MiniNavTab = Exclude<Tab, "payments" | "admin">;
 type Payment = {
   kind: "booking" | "subscription" | "trainer";
   id: number;
@@ -115,6 +124,23 @@ const WEEKDAYS = [
   { id: 7, short: "Вс" },
 ];
 
+const MINIAPP_NAV: Array<[MiniNavTab, string, string]> = [
+  ["home", "Главная", "⌂"],
+  ["schedule", "Запись", "◷"],
+  ["subscriptions", "Абонемент", "◇"],
+  ["trainer", "Тренажёр", "∿"],
+  ["profile", "Профиль", "○"],
+];
+
+type NavLens = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  ready: boolean;
+  dragging: boolean;
+};
+
 const STATUS: Record<string, string> = {
   active: "Активен",
   ending: "Скоро закончится",
@@ -215,6 +241,143 @@ export function MiniApp() {
     mimeType: string;
     name: string;
   } | null>(null);
+  const miniNavRef = useRef<HTMLElement>(null);
+  const miniNavButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const navDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressNavClickRef = useRef(false);
+  const [dragNavIndex, setDragNavIndex] = useState<number | null>(null);
+  const [navLens, setNavLens] = useState<NavLens>({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    ready: false,
+    dragging: false,
+  });
+
+  const activeNavTab: MiniNavTab = tab === "payments" ? "profile" :
+    tab === "admin" ? "home" : tab;
+  const activeNavIndex = Math.max(
+    0,
+    MINIAPP_NAV.findIndex(([value]) => value === activeNavTab),
+  );
+
+  function measuredLens(index: number, pointerX?: number): NavLens | null {
+    const nav = miniNavRef.current;
+    const button = miniNavButtonRefs.current[index];
+    if (!nav || !button) return null;
+    const content = button.querySelector<HTMLElement>("[data-mini-nav-content]");
+    const contentWidth = content?.getBoundingClientRect().width || button.offsetWidth;
+    const width = Math.min(button.offsetWidth - 4, Math.max(48, contentWidth + 16));
+    const navRect = nav.getBoundingClientRect();
+    const x = pointerX === undefined
+      ? button.offsetLeft + (button.offsetWidth - width) / 2
+      : Math.min(
+          nav.clientWidth - width - 4,
+          Math.max(4, pointerX - navRect.left - width / 2),
+        );
+    return {
+      x,
+      y: button.offsetTop,
+      width,
+      height: button.offsetHeight,
+      ready: true,
+      dragging: pointerX !== undefined,
+    };
+  }
+
+  function nearestNavIndex(pointerX: number) {
+    let nearest = 0;
+    let distance = Number.POSITIVE_INFINITY;
+    miniNavButtonRefs.current.forEach((button, index) => {
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const current = Math.abs(pointerX - (rect.left + rect.width / 2));
+      if (current < distance) {
+        distance = current;
+        nearest = index;
+      }
+    });
+    return nearest;
+  }
+
+  function moveNavLens(pointerX: number) {
+    const index = nearestNavIndex(pointerX);
+    const nextLens = measuredLens(index, pointerX);
+    if (nextLens) setNavLens(nextLens);
+    setDragNavIndex((current) => {
+      if (current !== index) {
+        window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light");
+      }
+      return index;
+    });
+    return index;
+  }
+
+  function handleNavPointerDown(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    miniNavRef.current?.setPointerCapture(event.pointerId);
+    navDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      moved: false,
+    };
+    moveNavLens(event.clientX);
+  }
+
+  function handleNavPointerMove(event: ReactPointerEvent<HTMLElement>) {
+    const drag = navDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (Math.abs(event.clientX - drag.startX) > 5) drag.moved = true;
+    moveNavLens(event.clientX);
+  }
+
+  function finishNavDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = navDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const index = moveNavLens(event.clientX);
+    navDragRef.current = null;
+    if (miniNavRef.current?.hasPointerCapture(event.pointerId)) {
+      miniNavRef.current.releasePointerCapture(event.pointerId);
+    }
+    if (drag.moved) {
+      suppressNavClickRef.current = true;
+      window.setTimeout(() => {
+        suppressNavClickRef.current = false;
+      }, 0);
+    }
+    setDragNavIndex(null);
+    setTab(MINIAPP_NAV[index][0]);
+    const settledLens = measuredLens(index);
+    if (settledLens) setNavLens(settledLens);
+  }
+
+  function cancelNavDrag() {
+    navDragRef.current = null;
+    setDragNavIndex(null);
+    const settledLens = measuredLens(activeNavIndex);
+    if (settledLens) setNavLens(settledLens);
+  }
+
+  useLayoutEffect(() => {
+    if (data?.isAdmin) return;
+    const nav = miniNavRef.current;
+    const button = miniNavButtonRefs.current[activeNavIndex];
+    if (!nav || !button || navDragRef.current) return;
+    const update = () => {
+      const nextLens = measuredLens(activeNavIndex);
+      if (nextLens) setNavLens(nextLens);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(nav);
+    observer.observe(button);
+    return () => observer.disconnect();
+  }, [activeNavIndex, data?.isAdmin]);
 
   async function load() {
     setLoading(true);
@@ -255,6 +418,9 @@ export function MiniApp() {
     webApp?.setHeaderColor("#f6e6ea");
     webApp?.setBackgroundColor("#f6e6ea");
     webApp?.setBottomBarColor?.("#f6e6ea");
+    const trainerImage = new Image();
+    trainerImage.decoding = "async";
+    trainerImage.src = "/miniapp-trainer-product-fast.jpg";
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -1183,17 +1349,48 @@ export function MiniApp() {
       </div>
 
       {!data.isAdmin && (
-        <nav className="miniapp-nav" aria-label="Разделы личного кабинета">
-          {([
-            ["home", "Главная", "⌂"],
-            ["schedule", "Запись", "◷"],
-            ["subscriptions", "Абонемент", "◇"],
-            ["trainer", "Тренажёр", "∿"],
-            ["profile", "Профиль", "○"],
-          ] as Array<[Tab, string, string]>).map(([value, label, icon]) => (
-            <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>
-              <span aria-hidden="true">{icon}</span>
-              <small>{label}</small>
+        <nav
+          ref={miniNavRef}
+          className="miniapp-nav"
+          aria-label="Разделы личного кабинета"
+          onPointerDown={handleNavPointerDown}
+          onPointerMove={handleNavPointerMove}
+          onPointerUp={finishNavDrag}
+          onPointerCancel={cancelNavDrag}
+        >
+          <span
+            aria-hidden="true"
+            className={`miniapp-nav-lens ${navLens.dragging ? "is-dragging" : ""}`}
+            style={
+              {
+                "--mini-lens-x": `${navLens.x}px`,
+                "--mini-lens-y": `${navLens.y}px`,
+                "--mini-lens-width": `${navLens.width}px`,
+                "--mini-lens-height": `${navLens.height}px`,
+                opacity: navLens.ready ? 1 : 0,
+              } as CSSProperties
+            }
+          />
+          {MINIAPP_NAV.map(([value, label, icon], index) => (
+            <button
+              key={value}
+              ref={(node) => {
+                miniNavButtonRefs.current[index] = node;
+              }}
+              className={(dragNavIndex ?? activeNavIndex) === index ? "active" : ""}
+              aria-current={activeNavIndex === index ? "page" : undefined}
+              onClick={(event) => {
+                if (suppressNavClickRef.current) {
+                  event.preventDefault();
+                  return;
+                }
+                setTab(value);
+              }}
+            >
+              <span data-mini-nav-content>
+                <b aria-hidden="true">{icon}</b>
+                <small>{label}</small>
+              </span>
             </button>
           ))}
         </nav>
