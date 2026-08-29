@@ -26,6 +26,7 @@ import {
 import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import {
+  cancelGroupLesson,
   cancelIndividualLesson,
   rescheduleIndividualLesson,
   scheduleIndividualLesson,
@@ -142,7 +143,7 @@ export async function GET(req: NextRequest) {
       where: {
         clientId: client.id,
         kind: "trial",
-        status: "confirmed",
+        status: { in: ["confirmed", "credit"] },
       },
       select: {
         lesson: {
@@ -188,7 +189,9 @@ export async function GET(req: NextRequest) {
         kind: "booking" as const,
         id: item.id,
         title: item.tariffName || "Занятие",
-        detail: `${formatDateTime(item.lesson.startsAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`,
+        detail: item.status === "credit"
+          ? `В запасе до ${formatDateTime(item.holdExpiresAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`
+          : `${formatDateTime(item.lesson.startsAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`,
         amount: item.amount,
         status: item.status,
         createdAt: item.createdAt.toISOString(),
@@ -377,6 +380,15 @@ export async function GET(req: NextRequest) {
           (attendance) => attendance.plannedSubscriptionId === item.id,
         ).length,
       })),
+      bookingCredits: bookingPayments
+        .filter((item) => item.status === "credit" && item.holdExpiresAt > now)
+        .map((item) => ({
+          id: item.id,
+          title: item.tariffName || "Оплаченное занятие",
+          kind: item.kind,
+          type: item.lesson.type,
+          expiresAt: item.holdExpiresAt.toISOString(),
+        })),
       lessons: availableLessons,
       scheduledLessons: scheduledAttendances.map((attendance) => ({
         attendanceId: attendance.id,
@@ -519,6 +531,20 @@ export async function POST(req: NextRequest) {
       }
       await transferGroupLesson(client.id, attendanceId, targetLessonId);
       return NextResponse.json({ ok: true, message: "Запись перенесена без списания" });
+    }
+
+    if (body.action === "cancelGroup") {
+      const attendanceId = Number(body.attendanceId);
+      if (!Number.isInteger(attendanceId) || attendanceId < 1) {
+        throw new Error("Занятие не найдено");
+      }
+      const result = await cancelGroupLesson(client.id, attendanceId);
+      return NextResponse.json({
+        ok: true,
+        message: result.reserveUntil
+          ? `Запись отменена. Оплаченное занятие в запасе до ${formatDateTime(result.reserveUntil)}`
+          : "Запись отменена без списания с абонемента",
+      });
     }
 
     if (body.action === "cancelPayment") {

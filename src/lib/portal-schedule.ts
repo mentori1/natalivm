@@ -13,6 +13,7 @@ import {
 } from "@/lib/telegram-api";
 
 const CANCELLATION_LIMIT_MS = 30 * 60 * 1000;
+const GROUP_RESERVE_VALIDITY_MS = 30 * 24 * 60 * 60 * 1000;
 
 async function notifyAdmins(message: string) {
   await Promise.allSettled(
@@ -447,6 +448,82 @@ export async function transferGroupLesson(
   });
   await notifyAdmins(
     `${result.clientName} перенесла групповое занятие: ${formatDateTime(result.oldStartsAt)} → ${formatDateTime(result.newStartsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}. С абонемента ничего не списано.`,
+  );
+  return result;
+}
+
+export async function cancelGroupLesson(clientId: number, attendanceId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    await lockNumber(tx, attendanceId);
+    const attendance = await tx.attendance.findUnique({
+      where: { id: attendanceId },
+      include: {
+        lesson: true,
+        client: { select: { fullName: true } },
+      },
+    });
+    const now = currentMoscowWallClockDate();
+    if (
+      !attendance ||
+      attendance.clientId !== clientId ||
+      attendance.lesson.format !== "group" ||
+      attendance.lesson.startsAt <= now ||
+      attendance.status !== "enrolled" ||
+      attendance.enrollmentSource === "auto" ||
+      attendance.subscriptionId
+    ) {
+      throw new Error("Активная запись на групповое занятие не найдена");
+    }
+
+    const booking = await tx.botBooking.findFirst({
+      where: {
+        clientId,
+        lessonId: attendance.lessonId,
+        status: "confirmed",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const keepInReserve = Boolean(
+      booking &&
+      booking.amount > 0 &&
+      ["trial", "single"].includes(booking.kind),
+    );
+    const reserveUntil = keepInReserve
+      ? new Date(now.getTime() + GROUP_RESERVE_VALIDITY_MS)
+      : null;
+
+    await tx.attendance.delete({ where: { id: attendance.id } });
+    if (booking && reserveUntil) {
+      await tx.botBooking.update({
+        where: { id: booking.id },
+        data: {
+          status: "credit",
+          holdExpiresAt: reserveUntil,
+          reminder3hSentAt: null,
+          reminder1hSentAt: null,
+        },
+      });
+    } else {
+      await tx.botBooking.updateMany({
+        where: {
+          clientId,
+          lessonId: attendance.lessonId,
+          status: "confirmed",
+        },
+        data: { status: "cancelled" },
+      });
+    }
+
+    return {
+      clientName: attendance.client.fullName,
+      startsAt: attendance.lesson.startsAt,
+      type: attendance.lesson.type,
+      reserveUntil,
+    };
+  });
+
+  await notifyAdmins(
+    `${result.clientName} отменила групповое занятие ${formatDateTime(result.startsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.${result.reserveUntil ? ` Оплаченное занятие сохранено в запасе до ${formatDateTime(result.reserveUntil)}.` : " С абонемента ничего не списано."}`,
   );
   return result;
 }

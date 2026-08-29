@@ -668,7 +668,7 @@ export async function hasUsedTrial(
     where: {
       clientId,
       kind: "trial",
-      status: "confirmed",
+      status: { in: ["confirmed", "credit"] },
       lesson: { type },
     },
     select: { id: true },
@@ -706,12 +706,29 @@ export async function createBooking(
     );
     return;
   }
-  const quote = await quoteForClient(
-    client.id,
-    lesson.type as "online" | "offline",
-    lesson.startsAt,
-    options.priceItemId,
-  );
+  const reserve = await prisma.botBooking.findFirst({
+    where: {
+      clientId: client.id,
+      status: "credit",
+      kind: { in: ["trial", "single"] },
+      holdExpiresAt: { gte: lesson.startsAt },
+      lesson: { type: lesson.type },
+    },
+    orderBy: { holdExpiresAt: "asc" },
+  });
+  const quote = reserve
+    ? {
+        kind: reserve.kind,
+        tariffName: reserve.tariffName || "Занятие из запаса",
+        amount: 0,
+      }
+    : await quoteForClient(
+        client.id,
+        lesson.type as "online" | "offline",
+        lesson.startsAt,
+        options.priceItemId,
+      );
+  const creditBookingId = reserve?.id;
   if (!quote) {
     await replaceScreen(
       chatId,
@@ -725,6 +742,23 @@ export async function createBooking(
   const result = await prisma.$transaction(async (tx) => {
     if (usesPostgres) {
       await tx.$executeRaw`select pg_advisory_xact_lock(${lessonId})`;
+    }
+    if (creditBookingId) {
+      if (usesPostgres) {
+        await tx.$executeRaw`select pg_advisory_xact_lock(${creditBookingId}, 91)`;
+      }
+      const activeCredit = await tx.botBooking.findFirst({
+        where: {
+          id: creditBookingId,
+          clientId: client.id,
+          status: "credit",
+          holdExpiresAt: { gte: lesson.startsAt },
+        },
+        select: { id: true },
+      });
+      if (!activeCredit) {
+        throw new Error("Занятие из запаса уже использовано или срок его действия закончился");
+      }
     }
     const existingConfirmed = await tx.botBooking.findFirst({
       where: {
@@ -796,25 +830,36 @@ export async function createBooking(
         },
       });
     }
-    const booking = await tx.botBooking.create({
-      data: {
-        telegramChatId: chatId,
-        telegramUserId: String(user.id),
-        username: user.username ?? null,
-        displayName: telegramDisplayName(user),
-        clientId: client.id,
-        lessonId,
-        status: quote.amount === 0 ? "confirmed" : "awaiting_receipt",
-        kind: quote.kind,
-        tariffName: quote.tariffName,
-        amount: quote.amount,
-        holdExpiresAt:
-          quote.amount === 0
-            ? lesson.startsAt
-            : new Date(now.getTime() + holdMinutes * MINUTE),
-        ...(quote.amount === 0 ? { reviewedAt: now } : {}),
-      },
-    });
+    const booking = creditBookingId
+      ? await tx.botBooking.update({
+          where: { id: creditBookingId },
+          data: {
+            lessonId,
+            status: "confirmed",
+            holdExpiresAt: lesson.startsAt,
+            reminder3hSentAt: null,
+            reminder1hSentAt: null,
+          },
+        })
+      : await tx.botBooking.create({
+          data: {
+            telegramChatId: chatId,
+            telegramUserId: String(user.id),
+            username: user.username ?? null,
+            displayName: telegramDisplayName(user),
+            clientId: client.id,
+            lessonId,
+            status: quote.amount === 0 ? "confirmed" : "awaiting_receipt",
+            kind: quote.kind,
+            tariffName: quote.tariffName,
+            amount: quote.amount,
+            holdExpiresAt:
+              quote.amount === 0
+                ? lesson.startsAt
+                : new Date(now.getTime() + holdMinutes * MINUTE),
+            ...(quote.amount === 0 ? { reviewedAt: now } : {}),
+          },
+        });
     return { ok: true as const, alreadyBooked: false as const, booking };
   });
 

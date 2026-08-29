@@ -43,6 +43,13 @@ type PortalData = {
     frozen: boolean;
     scheduledLessons: number;
   }>;
+  bookingCredits: Array<{
+    id: number;
+    title: string;
+    kind: string;
+    type: LessonType;
+    expiresAt: string;
+  }>;
   lessons: Array<{
     id: number;
     title: string;
@@ -125,9 +132,9 @@ const WEEKDAYS = [
 ];
 
 const MINIAPP_NAV: Array<[MiniNavTab, string, string]> = [
-  ["home", "Главная", "⌂"],
-  ["schedule", "Запись", "◷"],
   ["subscriptions", "Абонемент", "◇"],
+  ["schedule", "Запись", "◷"],
+  ["home", "Главная", "⌂"],
   ["trainer", "Тренажёр", "∿"],
   ["profile", "Профиль", "○"],
 ];
@@ -155,6 +162,7 @@ const PAYMENT_STATUS: Record<string, string> = {
   confirmed: "Подтверждён",
   rejected: "Отклонён",
   expired: "Истёк",
+  credit: "В запасе",
 };
 
 function formatDate(value: string, withTime = false) {
@@ -894,16 +902,47 @@ export function MiniApp() {
                               </div>
                             </div>
                           ) : (
-                            <button
-                              type="button"
-                              className="miniapp-glass-pill"
-                              onClick={() => setEditingLesson(lesson.attendanceId)}
-                            >
-                              Перенести запись
-                            </button>
+                            <div className="miniapp-planned-actions">
+                              <button
+                                type="button"
+                                disabled={busy}
+                                className="miniapp-glass-pill is-danger"
+                                onClick={() => {
+                                  if (window.confirm("Отменить запись? Оплаченное пробное или разовое занятие останется в запасе на 30 дней. По абонементу списания не будет.")) {
+                                    void action({
+                                      action: "cancelGroup",
+                                      attendanceId: lesson.attendanceId,
+                                    });
+                                  }
+                                }}
+                              >
+                                Отменить запись
+                              </button>
+                              <button
+                                type="button"
+                                className="miniapp-glass-pill"
+                                onClick={() => setEditingLesson(lesson.attendanceId)}
+                              >
+                                Перенести запись
+                              </button>
+                            </div>
                           )
                         ) : (
-                          <span className="miniapp-glass-pill is-disabled">Других дат пока нет</span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            className="miniapp-glass-pill is-danger"
+                            onClick={() => {
+                              if (window.confirm("Отменить запись? Оплаченное пробное или разовое занятие останется в запасе на 30 дней. По абонементу списания не будет.")) {
+                                void action({
+                                  action: "cancelGroup",
+                                  attendanceId: lesson.attendanceId,
+                                });
+                              }
+                            }}
+                          >
+                            Отменить запись
+                          </button>
                         )}
                       </div>
                     )}
@@ -911,6 +950,43 @@ export function MiniApp() {
                 );
               }) : <div className="miniapp-empty">Подтверждённых записей пока нет.</div>}
             </div>
+
+            {data.bookingCredits.length > 0 && (
+              <div className="mt-6">
+                <p className="miniapp-kicker">В запасе</p>
+                <h3 className="text-xl font-bold">Неиспользованные занятия</h3>
+                <div className="mt-3 space-y-3">
+                  {data.bookingCredits.map((credit) => (
+                    <article key={credit.id} className="miniapp-credit-card">
+                      <div className="min-w-0 flex-1">
+                        <span className="miniapp-type">
+                          {credit.type === "online" ? "Онлайн" : "Офлайн"}
+                        </span>
+                        <p className="mt-2 font-bold">{credit.title}</p>
+                        <p className="mt-1 text-sm opacity-60">
+                          Использовать до {formatDate(credit.expiresAt)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="miniapp-small-button"
+                        onClick={() => {
+                          setType(credit.type);
+                          window.requestAnimationFrame(() => {
+                            document.getElementById("miniapp-group-lessons")?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                          });
+                        }}
+                      >
+                        Выбрать дату
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {individualSubscriptions.length > 0 && (
               <div className="mt-7">
@@ -962,7 +1038,7 @@ export function MiniApp() {
               </div>
             )}
 
-            <div className="mt-8">
+            <div id="miniapp-group-lessons" className="mt-8 scroll-mt-4">
               <p className="miniapp-kicker">Групповые занятия</p>
               <h3 className="text-xl font-bold">Выберите занятие</h3>
             </div>
@@ -1449,7 +1525,7 @@ export function MiniApp() {
               ref={(node) => {
                 miniNavButtonRefs.current[index] = node;
               }}
-              className={(dragNavIndex ?? activeNavIndex) === index ? "active" : ""}
+              className={`${(dragNavIndex ?? activeNavIndex) === index ? "active" : ""} ${value === "home" ? "is-home" : ""}`}
               aria-current={activeNavIndex === index ? "page" : undefined}
               onClick={(event) => {
                 if (suppressNavClickRef.current) {
