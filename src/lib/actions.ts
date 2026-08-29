@@ -294,6 +294,7 @@ export async function createSubscription(fd: FormData) {
     priceItem?.kind === "subscription" && priceItem.active ? priceItem : null;
   const minLessons = tariff?.minLessons ?? 4;
   const totalLessons = Math.max(minLessons, num(fd, "totalLessons", 4));
+  const unlimited = fd.get("unlimited") === "on";
   const purchasedAt = dateOrNull(fd, "purchasedAt") ?? new Date();
   const termDays = num(fd, "termDays", DEFAULT_TERM_DAYS) || DEFAULT_TERM_DAYS;
   const expiresAt =
@@ -322,6 +323,7 @@ export async function createSubscription(fd: FormData) {
         format,
         tariffName: tariff ? tariff.name : strOrNull(fd, "tariffName"),
         totalLessons,
+        unlimited,
         usedLessons: 0,
         pricePerLesson,
         purchasedAt,
@@ -453,7 +455,7 @@ export async function toggleVisit(subId: number, dateStr: string) {
       data: { usedLessons: used, status: derivedSubStatus({ ...sub, usedLessons: used }) },
     });
   } else {
-    if (sub.usedLessons >= sub.totalLessons) return; // абонемент уже исчерпан
+    if (!sub.unlimited && sub.usedLessons >= sub.totalLessons) return;
     await prisma.subscriptionVisit.create({ data: { subscriptionId: subId, date } });
     const used = sub.usedLessons + 1;
     await prisma.subscription.update({
@@ -482,7 +484,9 @@ export async function setUsedLessons(fd: FormData) {
   if (!sub) return;
   // не меньше уже записанных дат и не больше купленного
   const datedCount = sub.visits.length + sub.attendances.length;
-  const used = Math.min(sub.totalLessons, Math.max(datedCount, n));
+  const used = sub.unlimited
+    ? Math.max(datedCount, n)
+    : Math.min(sub.totalLessons, Math.max(datedCount, n));
   await prisma.subscription.update({
     where: { id },
     data: { usedLessons: used, status: derivedSubStatus({ ...sub, usedLessons: used }) },

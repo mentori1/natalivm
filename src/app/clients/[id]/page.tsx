@@ -214,7 +214,9 @@ export default async function ClientCardPage({
               const st = derivedSubStatus(s);
               const left = remaining(s);
               const pct =
-                s.totalLessons > 0
+                s.unlimited
+                  ? 100
+                  : s.totalLessons > 0
                   ? Math.round((s.usedLessons / s.totalLessons) * 100)
                   : 0;
               return (
@@ -234,7 +236,7 @@ export default async function ClientCardPage({
                         </Badge>
                       </div>
                       <span className="flex items-center gap-0.5 text-sm font-semibold text-brand-dark">
-                        осталось {left}
+                        {s.unlimited ? "безлимит" : `осталось ${left}`}
                         <IconChevronRight className="size-4 text-muted/50" />
                       </span>
                     </div>
@@ -246,11 +248,12 @@ export default async function ClientCardPage({
                       />
                     </div>
                     <p className="mt-2 text-xs text-muted">
-                      Использовано {s.usedLessons} из {s.totalLessons} ·{" "}
+                      Использовано {s.usedLessons}
+                      {s.unlimited ? " · без ограничений" : ` из ${s.totalLessons}`} ·{" "}
                       {s.pricePerLesson > 0
                         ? formatMoney(s.totalLessons * s.pricePerLesson)
                         : "бартер"}{" "}
-                      · до {formatDate(s.expiresAt)}
+                      · {s.unlimited ? "без срока" : `до ${formatDate(s.expiresAt)}`}
                     </p>
                   </Link>
                 </Card>

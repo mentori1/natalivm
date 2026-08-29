@@ -315,6 +315,7 @@ export function daysBetween(a: Date, b: Date): number {
 
 export interface SubLike {
   totalLessons: number;
+  unlimited?: boolean;
   usedLessons: number;
   expiresAt: Date;
   frozen: boolean;
@@ -322,6 +323,7 @@ export interface SubLike {
 }
 
 export function remaining(sub: SubLike): number {
+  if (sub.unlimited) return Number.MAX_SAFE_INTEGER;
   return Math.max(0, sub.totalLessons - sub.usedLessons);
 }
 

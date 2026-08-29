@@ -61,7 +61,9 @@ export default async function SubscriptionPage({
   const st = derivedSubStatus(sub);
   const left = remaining(sub);
   const pct =
-    sub.totalLessons > 0
+    sub.unlimited
+      ? 100
+      : sub.totalLessons > 0
       ? Math.round((sub.usedLessons / sub.totalLessons) * 100)
       : 0;
 
@@ -115,7 +117,7 @@ export default async function SubscriptionPage({
             </Badge>
           </div>
           <span className="text-sm font-semibold text-brand-dark">
-            осталось {left}
+            {sub.unlimited ? "безлимит" : `осталось ${left}`}
           </span>
         </div>
 
@@ -127,8 +129,11 @@ export default async function SubscriptionPage({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <Row label="Использовано" value={`${sub.usedLessons} из ${sub.totalLessons}`} />
-          <Row label="Осталось" value={pluralLessons(left)} />
+          <Row
+            label="Использовано"
+            value={sub.unlimited ? pluralLessons(sub.usedLessons) : `${sub.usedLessons} из ${sub.totalLessons}`}
+          />
+          <Row label="Осталось" value={sub.unlimited ? "Без ограничений" : pluralLessons(left)} />
           <Row
             label="Стоимость"
             value={
@@ -138,7 +143,7 @@ export default async function SubscriptionPage({
             }
           />
           <Row label="Куплен" value={formatDate(sub.purchasedAt)} />
-          <Row label="Действует до" value={formatDate(sub.expiresAt)} />
+          <Row label="Действует до" value={sub.unlimited ? "Без срока" : formatDate(sub.expiresAt)} />
         </div>
       </Card>
 
@@ -156,7 +161,7 @@ export default async function SubscriptionPage({
                   name="used"
                   type="number"
                   min={0}
-                  max={sub.totalLessons}
+                  max={sub.unlimited ? undefined : sub.totalLessons}
                   defaultValue={sub.usedLessons}
                   className="w-28"
                 />

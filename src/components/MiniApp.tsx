@@ -36,6 +36,7 @@ type PortalData = {
     format: string;
     name: string;
     totalLessons: number;
+    unlimited: boolean;
     usedLessons: number;
     remaining: number;
     expiresAt: string;
@@ -1619,7 +1620,9 @@ export function MiniApp() {
 }
 
 function SubscriptionCard({ subscription }: { subscription: PortalData["subscriptions"][number] }) {
-  const progress = subscription.totalLessons
+  const progress = subscription.unlimited
+    ? 100
+    : subscription.totalLessons
     ? Math.min(100, Math.round((subscription.usedLessons / subscription.totalLessons) * 100))
     : 0;
   return (
@@ -1628,13 +1631,16 @@ function SubscriptionCard({ subscription }: { subscription: PortalData["subscrip
         <div>
           <span className="miniapp-type">{subscription.type === "online" ? "Онлайн" : "Офлайн"}</span>
           <h3 className="mt-2 font-bold">{subscription.name}</h3>
+          <p className="mt-1 text-xs opacity-60">
+            Посещений: {subscription.usedLessons}
+          </p>
         </div>
-        <strong className="text-xl">{subscription.remaining}</strong>
+        <strong className="text-xl">{subscription.unlimited ? "∞" : subscription.remaining}</strong>
       </div>
       <div className="miniapp-progress mt-4"><span style={{ width: `${progress}%` }} /></div>
       <div className="mt-2 flex justify-between text-xs opacity-60">
         <span>{STATUS[subscription.status] || subscription.status}</span>
-        <span>до {formatDate(subscription.expiresAt)}</span>
+        <span>{subscription.unlimited ? "без срока" : `до ${formatDate(subscription.expiresAt)}`}</span>
       </div>
     </article>
   );

@@ -101,6 +101,7 @@ model Subscription {
   tariffName     String? // название тарифа на момент продажи
   purchasedAt    DateTime  @default(now())
   totalLessons   Int // куплено занятий
+  unlimited      Boolean   @default(false) // без ограничения по числу занятий
   usedLessons    Int       @default(0) // использовано занятий
   pricePerLesson Float     @default(0) // цена за одно занятие, ₽
   expiresAt      DateTime // дата окончания срока (обычно +1.5 мес)

@@ -371,6 +371,7 @@ export async function GET(req: NextRequest) {
         format: item.format,
         name: item.tariffName || "Абонемент",
         totalLessons: item.totalLessons,
+        unlimited: item.unlimited,
         usedLessons: item.usedLessons,
         remaining: remaining(item),
         expiresAt: item.expiresAt.toISOString(),

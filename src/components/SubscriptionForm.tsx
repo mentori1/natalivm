@@ -35,6 +35,7 @@ export function SubscriptionForm({
   const [tariffName, setTariffName] = useState(initial?.name ?? "");
   const [price, setPrice] = useState(initial?.price ?? 1500);
   const [lessons, setLessons] = useState(initial?.minLessons ?? 4);
+  const [unlimited, setUnlimited] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(() =>
     emptySchedule(initial?.minLessons ?? 4),
   );
@@ -129,6 +130,7 @@ export function SubscriptionForm({
               min={4}
               step={1}
               value={lessons}
+              disabled={unlimited}
               onChange={(e) => {
                 const nextLessons = Math.max(4, Number(e.target.value) || 4);
                 setLessons(nextLessons);
@@ -137,6 +139,16 @@ export function SubscriptionForm({
               required
             />
           </Field>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink">
+            <input
+              name="unlimited"
+              type="checkbox"
+              checked={unlimited}
+              onChange={(event) => setUnlimited(event.target.checked)}
+              className="size-4 accent-[var(--color-brand)]"
+            />
+            Безлимитный абонемент
+          </label>
           <Field label="Цена за занятие, ₽">
             <Input
               name="pricePerLesson"
