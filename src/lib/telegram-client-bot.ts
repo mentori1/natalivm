@@ -568,7 +568,26 @@ async function quoteForClient(
   clientId: number,
   type: "online" | "offline",
   lessonDate: Date,
+  priceItemId?: number,
 ) {
+  if (priceItemId) {
+    const selected = await prisma.priceItem.findFirst({
+      where: {
+        id: priceItemId,
+        active: true,
+        type,
+        format: "group",
+        kind: { in: ["trial", "single"] },
+      },
+    });
+    if (!selected) return null;
+    return {
+      kind: selected.kind,
+      tariffName: selected.name,
+      amount: selected.price,
+    };
+  }
+
   const subscriptions = await prisma.subscription.findMany({
     where: { clientId, type, format: "group" },
   });
@@ -614,7 +633,7 @@ export async function createBooking(
   chatId: string,
   user: TelegramUser,
   lessonId: number,
-  options: { notifyChat?: boolean } = {},
+  options: { notifyChat?: boolean; priceItemId?: number } = {},
 ) {
   const notifyChat = options.notifyChat !== false;
   if (!(await requireSubscription(chatId, String(user.id)))) return;
@@ -640,7 +659,12 @@ export async function createBooking(
     );
     return;
   }
-  const quote = await quoteForClient(client.id, lesson.type as "online" | "offline", lesson.startsAt);
+  const quote = await quoteForClient(
+    client.id,
+    lesson.type as "online" | "offline",
+    lesson.startsAt,
+    options.priceItemId,
+  );
   if (!quote) {
     await replaceScreen(
       chatId,

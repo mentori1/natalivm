@@ -68,7 +68,7 @@ type PortalData = {
     format: string;
     price: number;
     minLessons: number;
-    purchasable: boolean;
+    requiresLesson: boolean;
   }>;
   preferences: { preferredType: string; preferredWeekdays: number[] };
   paymentReady: boolean;
@@ -208,6 +208,7 @@ export function MiniApp() {
   const [editDates, setEditDates] = useState<Record<number, string>>({});
   const [editingLesson, setEditingLesson] = useState<number | null>(null);
   const [transferTargets, setTransferTargets] = useState<Record<number, number>>({});
+  const [selectedBookingPriceId, setSelectedBookingPriceId] = useState<number | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<{
     url: string;
     mimeType: string;
@@ -356,6 +357,9 @@ export function MiniApp() {
   const filteredPrices = data?.prices.filter(
     (price) => price.type === priceType && price.format === priceFormat,
   ) || [];
+  const selectedBookingPrice = data?.prices.find(
+    (price) => price.id === selectedBookingPriceId,
+  );
   const nextBooking = data?.scheduledLessons[0] ||
     data?.bookings.find((booking) => booking.status === "confirmed");
   const bookedLessonIds = new Set([
@@ -706,9 +710,18 @@ export function MiniApp() {
               <p className="miniapp-kicker">Групповые занятия</p>
               <h3 className="text-xl font-bold">Выберите занятие</h3>
             </div>
+            {selectedBookingPrice && (
+              <div className="miniapp-payment-callout mt-4">
+                <span>
+                  <small>Выбран тариф</small>
+                  <strong>{selectedBookingPrice.name} · {money(selectedBookingPrice.price)}</strong>
+                </span>
+                <button onClick={() => setSelectedBookingPriceId(null)}>Сбросить</button>
+              </div>
+            )}
             <div className="miniapp-segment mt-4">
-              <button className={type === "online" ? "active" : ""} onClick={() => setType("online")}>Онлайн</button>
-              <button className={type === "offline" ? "active" : ""} onClick={() => setType("offline")}>Офлайн</button>
+              <button className={type === "online" ? "active" : ""} onClick={() => { setType("online"); setSelectedBookingPriceId(null); }}>Онлайн</button>
+              <button className={type === "offline" ? "active" : ""} onClick={() => { setType("offline"); setSelectedBookingPriceId(null); }}>Офлайн</button>
             </div>
             <div className="mt-4 space-y-3">
               {filteredLessons.length ? filteredLessons.map((lesson) => {
@@ -727,10 +740,17 @@ export function MiniApp() {
                     <button
                       disabled={busy || booked}
                       className="miniapp-small-button"
-                      onClick={() => void action(
-                        { action: "book", lessonId: lesson.id },
-                        { openPaymentsWhenRequired: true },
-                      )}
+                      onClick={() => void (async () => {
+                        const result = await action(
+                          {
+                            action: "book",
+                            lessonId: lesson.id,
+                            priceItemId: selectedBookingPriceId || undefined,
+                          },
+                          { openPaymentsWhenRequired: true },
+                        );
+                        if (result) setSelectedBookingPriceId(null);
+                      })()}
                     >
                       {booked ? "Записаны" : "Выбрать"}
                     </button>
@@ -802,25 +822,36 @@ export function MiniApp() {
                         {price.kind === "subscription" ? " за занятие" : ""}
                       </p>
                     </div>
-                    {price.purchasable && (
-                      <div className="mt-5 flex items-center justify-between gap-3">
+                    <div className="mt-5 flex items-center justify-between gap-3">
+                      {price.kind === "subscription" && (
                         <div className="miniapp-stepper">
                           <button onClick={() => setLessonCounts((old) => ({ ...old, [price.id]: Math.max(price.minLessons, count - 1) }))}>−</button>
                           <span>{count}</span>
                           <button onClick={() => setLessonCounts((old) => ({ ...old, [price.id]: count + 1 }))}>+</button>
                         </div>
-                        <button
-                          disabled={busy}
-                          className="miniapp-small-button"
-                          onClick={() => void action(
-                            { action: "subscription", priceItemId: price.id, totalLessons: count },
+                      )}
+                      <button
+                        disabled={busy}
+                        className="miniapp-small-button ml-auto"
+                        onClick={() => {
+                          if (price.requiresLesson) {
+                            setType(price.type);
+                            setSelectedBookingPriceId(price.id);
+                            setTab("schedule");
+                            setNotice("Выберите дату занятия");
+                            return;
+                          }
+                          void action(
+                            { action: "purchaseTariff", priceItemId: price.id, totalLessons: count },
                             { openPaymentsWhenRequired: true },
-                          )}
-                        >
-                          Купить · {money(price.price * count)}
-                        </button>
-                      </div>
-                    )}
+                          );
+                        }}
+                      >
+                        {price.requiresLesson
+                          ? `Выбрать дату · ${money(price.price)}`
+                          : `Купить · ${money(price.price * count)}`}
+                      </button>
+                    </div>
                   </article>
                 );
               })}

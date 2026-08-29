@@ -352,8 +352,8 @@ export async function GET(req: NextRequest) {
         kind: item.kind,
         format: item.format,
         price: item.price,
-        minLessons: item.minLessons || 4,
-        purchasable: item.kind === "subscription",
+        minLessons: item.kind === "subscription" ? (item.minLessons || 4) : 1,
+        requiresLesson: item.kind !== "subscription" && item.format === "group",
       })),
       preferences: {
         preferredType: fullClient.portalPreference?.preferredType || "both",
@@ -546,6 +546,7 @@ export async function POST(req: NextRequest) {
       }
       await createBooking(String(user.id), user, Number(body.lessonId), {
         notifyChat: false,
+        priceItemId: body.priceItemId,
       });
       const booking = await prisma.botBooking.findFirst({
         where: {
@@ -628,17 +629,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (body.action === "subscription") {
+    if (body.action === "purchaseTariff") {
       const priceItem = await prisma.priceItem.findFirst({
         where: {
           id: Number(body.priceItemId),
           active: true,
-          kind: "subscription",
         },
       });
       if (!priceItem) throw new Error("Тариф больше недоступен");
-      const minLessons = Math.max(4, priceItem.minLessons || 4);
-      const totalLessons = Math.max(minLessons, Number(body.totalLessons) || minLessons);
+      if (priceItem.kind !== "subscription" && priceItem.format === "group") {
+        throw new Error("Для пробного или разового занятия сначала выберите дату");
+      }
+      const minLessons = priceItem.kind === "subscription"
+        ? Math.max(4, priceItem.minLessons || 4)
+        : 1;
+      const totalLessons = priceItem.kind === "subscription"
+        ? Math.max(minLessons, Number(body.totalLessons) || minLessons)
+        : 1;
       if (!Number.isInteger(totalLessons) || totalLessons > 100) {
         throw new Error("Проверьте количество занятий");
       }
