@@ -11,6 +11,12 @@ import {
 } from "@/lib/domain";
 import { ensureDefaultPriceItems } from "@/lib/prices";
 import {
+  approveBookingPayment,
+  approveSubscriptionPayment,
+  rejectBookingPayment,
+  rejectSubscriptionPayment,
+} from "@/lib/payment-review";
+import {
   bindClientWithPortalToken,
   findClientByTelegram,
   syncTelegramClient,
@@ -37,7 +43,7 @@ const BOT_PHOTO_PATHS = {
 } as const;
 type BotPhotoField = keyof typeof BOT_PHOTO_PATHS;
 
-function mainMenu(_copy: BotCopy) {
+function mainMenu() {
   return { remove_keyboard: true };
 }
 
@@ -113,12 +119,11 @@ async function replaceScreen(
   text: string,
   replyMarkup?: Record<string, unknown>,
 ) {
-  const copy = replyMarkup ? null : await getBotCopy();
   await clearPreviousScreen(chatId);
   const message = await sendTelegramMessage(
     chatId,
     text,
-    replyMarkup ?? mainMenu(copy!),
+    replyMarkup ?? mainMenu(),
   );
   await saveScreen(chatId, [message.message_id]);
   return message;
@@ -129,7 +134,6 @@ async function replaceWelcomeScreen(
   caption: string,
   photoFileId: string | null,
 ) {
-  const copy = await getBotCopy();
   await clearPreviousScreen(chatId);
 
   const message = photoFileId
@@ -137,13 +141,13 @@ async function replaceWelcomeScreen(
         chat_id: chatId,
         photo: photoFileId,
         caption,
-        reply_markup: mainMenu(copy),
+        reply_markup: mainMenu(),
       })
     : await sendTelegramPhotoFile(
         chatId,
         join(process.cwd(), "public", "bot-welcome.png"),
         caption,
-        mainMenu(copy),
+        mainMenu(),
       );
 
   const uploadedPhotoFileId = message.photo?.at(-1)?.file_id;
@@ -176,8 +180,7 @@ async function replacePhotoScreen(
   replyMarkup?: Record<string, unknown>,
   videoFileId?: string | null,
 ) {
-  const copy = await getBotCopy();
-  const finalReplyMarkup = replyMarkup ?? mainMenu(copy);
+  const finalReplyMarkup = replyMarkup ?? mainMenu();
   await clearPreviousScreen(chatId);
 
   const captionFits = text.length <= 1024;
@@ -609,7 +612,9 @@ export async function createBooking(
   chatId: string,
   user: TelegramUser,
   lessonId: number,
+  options: { notifyChat?: boolean } = {},
 ) {
+  const notifyChat = options.notifyChat !== false;
   if (!(await requireSubscription(chatId, String(user.id)))) return;
   const settings = await getBotSettings();
   const copy = await getBotCopy();
@@ -751,13 +756,15 @@ export async function createBooking(
     return;
   }
   if (quote.amount === 0) {
-    await replaceScreen(
-      chatId,
-      copy.text("subscriptionBooked", {
-        date: formatDateTime(lesson.startsAt),
-        format: lesson.type === "online" ? "онлайн" : "офлайн",
-      }),
-    );
+    if (notifyChat) {
+      await replaceScreen(
+        chatId,
+        copy.text("subscriptionBooked", {
+          date: formatDateTime(lesson.startsAt),
+          format: lesson.type === "online" ? "онлайн" : "офлайн",
+        }),
+      );
+    }
     return;
   }
   if (!settings.paymentDetails) {
@@ -772,28 +779,30 @@ export async function createBooking(
     return;
   }
 
-  await replaceScreen(
-    chatId,
-    copy.text("paymentInstructions", {
-      date: formatDateTime(lesson.startsAt),
-      format: lesson.type === "online" ? "онлайн" : "офлайн",
-      tariff: quote.tariffName,
-      amount: quote.amount.toLocaleString("ru-RU"),
-      paymentDetails: settings.paymentDetails,
-      holdMinutes,
-    }),
-    {
-      inline_keyboard: [
-        [
-          {
-            text: copy.text("buttonCancelBooking"),
-            callback_data: `client:cancel:${result.booking.id}`,
-          },
+  if (notifyChat) {
+    await replaceScreen(
+      chatId,
+      copy.text("paymentInstructions", {
+        date: formatDateTime(lesson.startsAt),
+        format: lesson.type === "online" ? "онлайн" : "офлайн",
+        tariff: quote.tariffName,
+        amount: quote.amount.toLocaleString("ru-RU"),
+        paymentDetails: settings.paymentDetails,
+        holdMinutes,
+      }),
+      {
+        inline_keyboard: [
+          [
+            {
+              text: copy.text("buttonCancelBooking"),
+              callback_data: `client:cancel:${result.booking.id}`,
+            },
+          ],
+          [{ text: copy.text("buttonMenu"), callback_data: "client:menu" }],
         ],
-        [{ text: copy.text("buttonMenu"), callback_data: "client:menu" }],
-      ],
-    },
-  );
+      },
+    );
+  }
 }
 
 async function acceptSubscriptionReceipt(
@@ -811,7 +820,7 @@ async function acceptSubscriptionReceipt(
     where: {
       telegramChatId: String(message.chat.id),
       telegramUserId: String(message.from.id),
-      status: "awaiting_receipt",
+      status: { in: ["awaiting_receipt", "rejected"] },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -883,7 +892,7 @@ async function acceptReceipt(message: TelegramMessage) {
     where: {
       telegramChatId: String(message.chat.id),
       telegramUserId: String(message.from.id),
-      status: "awaiting_receipt",
+      status: { in: ["awaiting_receipt", "rejected"] },
       holdExpiresAt: { gt: now },
     },
     include: { lesson: true },
@@ -956,85 +965,7 @@ async function approveBooking(query: TelegramCallbackQuery, bookingId: number) {
     await answerCallback(query.id, "Нет доступа", true);
     return;
   }
-  const now = new Date();
-  const initial = await prisma.botBooking.findUnique({
-    where: { id: bookingId },
-    include: { lesson: true },
-  });
-  if (!initial) {
-    await answerCallback(query.id, "Заявка не найдена", true);
-    return;
-  }
-  if (initial.status === "confirmed") {
-    await answerCallback(query.id, "Уже подтверждено");
-    await editCallbackButtons(query);
-    return;
-  }
-  if (initial.status !== "review") {
-    await answerCallback(query.id, "Заявка уже не ожидает проверки", true);
-    return;
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    if (usesPostgres) {
-      await tx.$executeRaw`select pg_advisory_xact_lock(${initial.lessonId})`;
-    }
-    const booking = await tx.botBooking.findUnique({
-      where: { id: bookingId },
-      include: { lesson: { include: { attendances: true } } },
-    });
-    if (!booking || booking.status !== "review" || !booking.clientId) {
-      return { ok: false as const, reason: "changed" as const };
-    }
-    const enrolled = booking.lesson.attendances.filter(
-      (item) => item.status !== "absent",
-    ).length;
-    const alreadyEnrolled = booking.lesson.attendances.some(
-      (item) => item.clientId === booking.clientId && item.status !== "absent",
-    );
-    if (
-      booking.lesson.startsAt < currentMoscowWallClockDate() ||
-      (!alreadyEnrolled &&
-        booking.lesson.capacity &&
-        enrolled >= booking.lesson.capacity)
-    ) {
-      await tx.botBooking.update({
-        where: { id: bookingId },
-        data: { status: "expired", reviewedByTelegramId: adminId, reviewedAt: now },
-      });
-      return { ok: false as const, reason: "full" as const };
-    }
-    await tx.attendance.upsert({
-      where: {
-        lessonId_clientId: {
-          lessonId: booking.lessonId,
-          clientId: booking.clientId,
-        },
-      },
-      create: {
-        lessonId: booking.lessonId,
-        clientId: booking.clientId,
-        status: "enrolled",
-      },
-      update: { status: "enrolled" },
-    });
-    await tx.botBooking.update({
-      where: { id: bookingId },
-      data: {
-        status: "confirmed",
-        reviewedByTelegramId: adminId,
-        reviewedAt: now,
-        holdExpiresAt: booking.lesson.startsAt,
-      },
-    });
-    if (booking.kind === "trial") {
-      await tx.client.updateMany({
-        where: { id: booking.clientId, status: "lead" },
-        data: { status: "trial" },
-      });
-    }
-    return { ok: true as const, booking };
-  });
+  const result = await approveBookingPayment(bookingId, adminId);
 
   await editCallbackButtons(query);
   if (!result.ok) {
@@ -1042,12 +973,16 @@ async function approveBooking(query: TelegramCallbackQuery, bookingId: number) {
       query.id,
       result.reason === "full"
         ? "Занятие уже прошло или мест больше нет"
-        : "Заявка уже изменилась",
-      true,
+        : result.reason === "already"
+          ? "Уже подтверждено"
+          : result.reason === "not_found"
+            ? "Заявка не найдена"
+            : "Заявка уже изменилась",
+      result.reason !== "already",
     );
-    if (result.reason === "full") {
+    if (result.reason === "full" && result.booking) {
       await replaceScreen(
-        initial.telegramChatId,
+        result.booking.telegramChatId,
         copy.text("paymentUnavailable"),
       ).catch(() => undefined);
     }
@@ -1074,28 +1009,16 @@ async function rejectBooking(query: TelegramCallbackQuery, bookingId: number) {
     await answerCallback(query.id, "Нет доступа", true);
     return;
   }
-  const booking = await prisma.botBooking.findUnique({
-    where: { id: bookingId },
-  });
-  if (!booking || booking.status !== "review") {
+  const settings = await getBotSettings();
+  const booking = await rejectBookingPayment(
+    bookingId,
+    adminId,
+    settings.bookingHoldMinutes,
+  );
+  if (!booking) {
     await answerCallback(query.id, "Заявка уже не ожидает проверки", true);
     return;
   }
-  const settings = await getBotSettings();
-  await prisma.botBooking.update({
-    where: { id: bookingId },
-    data: {
-      status: "awaiting_receipt",
-      receiptFileId: null,
-      receiptFileName: null,
-      receiptMimeType: null,
-      reviewedByTelegramId: adminId,
-      reviewedAt: new Date(),
-      holdExpiresAt: new Date(
-        Date.now() + Math.max(5, settings.bookingHoldMinutes) * MINUTE,
-      ),
-    },
-  });
   await editCallbackButtons(query);
   await answerCallback(query.id, "Чек отклонён");
   await replaceScreen(
@@ -1113,40 +1036,8 @@ async function approveSubscriptionOrder(
     await answerCallback(query.id, "Нет доступа", true);
     return;
   }
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 45 * 24 * HOUR);
-  const result = await prisma.$transaction(async (tx) => {
-    const order = await tx.subscriptionOrder.findUnique({ where: { id: orderId } });
-    if (!order || order.status !== "review") return null;
-    const subscription = await tx.subscription.create({
-      data: {
-        clientId: order.clientId,
-        type: order.type,
-        format: order.format,
-        tariffName: order.tariffName,
-        purchasedAt: now,
-        totalLessons: order.totalLessons,
-        usedLessons: 0,
-        pricePerLesson: order.pricePerLesson,
-        expiresAt,
-        status: "active",
-      },
-    });
-    await tx.subscriptionOrder.update({
-      where: { id: order.id },
-      data: {
-        status: "confirmed",
-        reviewedByTelegramId: adminId,
-        reviewedAt: now,
-      },
-    });
-    await tx.client.updateMany({
-      where: { id: order.clientId, status: { not: "barter" } },
-      data: { status: "active" },
-    });
-    return { order, subscription };
-  });
-  if (!result) {
+  const result = await approveSubscriptionPayment(orderId, adminId);
+  if (!result.ok) {
     await answerCallback(query.id, "Заявка уже обработана", true);
     return;
   }
@@ -1156,7 +1047,7 @@ async function approveSubscriptionOrder(
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(expiresAt);
+  }).format(result.expiresAt);
   await replaceScreen(
     result.order.telegramChatId,
     `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
@@ -1172,31 +1063,18 @@ async function rejectSubscriptionOrder(
     await answerCallback(query.id, "Нет доступа", true);
     return;
   }
-  const result = await prisma.subscriptionOrder.updateMany({
-    where: { id: orderId, status: "review" },
-    data: {
-      status: "awaiting_receipt",
-      receiptFileId: null,
-      receiptFileName: null,
-      receiptMimeType: null,
-      reviewedByTelegramId: adminId,
-      reviewedAt: new Date(),
-    },
-  });
+  const order = await rejectSubscriptionPayment(orderId, adminId);
   await editCallbackButtons(query);
   await answerCallback(
     query.id,
-    result.count ? "Чек отклонён" : "Заявка уже обработана",
-    !result.count,
+    order ? "Чек отклонён" : "Заявка уже обработана",
+    !order,
   );
-  if (result.count) {
-    const order = await prisma.subscriptionOrder.findUnique({ where: { id: orderId } });
-    if (order) {
-      await replaceScreen(
-        order.telegramChatId,
-        "Платёж пока не подтверждён. Проверьте чек и отправьте корректный PDF или фотографию ещё раз.",
-      );
-    }
+  if (order) {
+    await replaceScreen(
+      order.telegramChatId,
+      "Платёж пока не подтверждён. Проверьте чек и отправьте корректный PDF или фотографию ещё раз.",
+    );
   }
 }
 

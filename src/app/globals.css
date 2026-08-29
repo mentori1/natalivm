@@ -73,6 +73,38 @@
 .miniapp-nav button > span { font-size:22px; line-height:1; }
 .miniapp-nav button small { font-size:10px; font-weight:700; }
 .miniapp-nav button.active { background:var(--mini-ink); color:var(--mini-bg); }
+.miniapp-admin-shortcut { display:flex; align-items:center; gap:6px; border:1px solid rgba(26,10,15,.12); border-radius:999px; background:var(--mini-surface); padding:7px 10px; color:var(--mini-ink); font-size:11px; font-weight:800; }
+.miniapp-admin-shortcut strong, .miniapp-admin-count { display:grid; min-width:21px; height:21px; place-items:center; border-radius:999px; background:var(--mini-ink); color:var(--mini-bg); font-size:11px; }
+.miniapp-payment-callout { display:flex; width:100%; align-items:center; justify-content:space-between; gap:16px; border:1px solid rgba(143,41,71,.2); border-radius:18px; background:rgba(255,249,251,.82); padding:16px 17px; text-align:left; box-shadow:0 9px 24px rgba(26,10,15,.07); }
+.miniapp-payment-callout span { display:flex; min-width:0; flex-direction:column; gap:3px; }
+.miniapp-payment-callout small { color:var(--mini-accent); font-size:10px; font-weight:850; letter-spacing:.07em; text-transform:uppercase; }
+.miniapp-payment-callout strong { font-size:14px; }
+.miniapp-payment-callout b { flex:0 0 auto; color:var(--mini-accent); font-size:12px; }
+.miniapp-payment-details { border:1px solid rgba(255,255,255,.54); border-radius:20px; background:rgba(255,249,251,.68); padding:18px; box-shadow:0 13px 30px rgba(26,10,15,.1); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+.miniapp-copy-button { flex:0 0 auto; border:1px solid rgba(26,10,15,.13); border-radius:11px; background:rgba(246,230,234,.72); padding:8px 10px; font-size:11px; font-weight:800; }
+.miniapp-payment-card { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); padding:17px; }
+.miniapp-payment-card.is-payable { border-color:rgba(143,41,71,.25); box-shadow:0 10px 26px rgba(26,10,15,.07); }
+.miniapp-payment-card.is-overdue { border-color:rgba(172,71,38,.42); background:#fff7f2; }
+.miniapp-payment-status { display:inline-flex; border-radius:999px; background:rgba(26,10,15,.07); padding:4px 8px; color:rgba(26,10,15,.62); font-size:10px; font-weight:850; text-transform:uppercase; }
+.miniapp-payment-status.is-review { background:#fff1cc; color:#865a00; }
+.miniapp-payment-status.is-confirmed { background:#e4f5ea; color:#28613c; }
+.miniapp-payment-status.is-rejected, .miniapp-payment-status.is-expired { background:#ffe8e8; color:#922f2f; }
+.miniapp-upload { display:grid; min-height:48px; cursor:pointer; place-items:center; border:1px dashed rgba(143,41,71,.5); border-radius:14px; background:rgba(246,230,234,.7); color:var(--mini-accent); font-size:13px; font-weight:850; }
+.miniapp-upload input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.miniapp-receipt-button, .miniapp-profile-link { border:1px solid rgba(26,10,15,.12); border-radius:12px; background:rgba(246,230,234,.66); padding:10px 12px; color:var(--mini-ink); font-size:12px; font-weight:800; }
+.miniapp-profile-link { display:flex; min-height:48px; align-items:center; justify-content:space-between; }
+.miniapp-profile-link strong { display:grid; min-width:25px; height:25px; place-items:center; border-radius:999px; background:var(--mini-ink); color:var(--mini-bg); font-size:11px; }
+.miniapp-overdue { display:inline-flex; border-radius:999px; background:#f4d7c8; padding:4px 7px; color:#8b3c24; font-size:10px; font-weight:850; text-transform:uppercase; }
+.miniapp-decline-button, .miniapp-approve-button { min-height:45px; border-radius:13px; font-size:13px; font-weight:850; }
+.miniapp-decline-button { border:1px solid rgba(146,47,47,.24); background:#fff0f0; color:#922f2f; }
+.miniapp-approve-button { background:var(--mini-ink); color:var(--mini-bg); }
+.miniapp-decline-button:disabled, .miniapp-approve-button:disabled { opacity:.45; }
+.miniapp-receipt-modal { position:fixed; z-index:150; inset:0; display:flex; align-items:flex-end; justify-content:center; background:rgba(26,10,15,.55); padding-top:env(safe-area-inset-top); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.miniapp-receipt-sheet { width:100%; max-width:520px; max-height:92dvh; overflow:hidden; border:1px solid rgba(255,255,255,.3); border-radius:24px 24px 0 0; background:var(--mini-surface); box-shadow:0 -18px 55px rgba(26,10,15,.28); }
+.miniapp-receipt-sheet > div { border-bottom:1px solid rgba(26,10,15,.1); }
+.miniapp-receipt-sheet button { border-radius:10px; background:var(--mini-ink); padding:7px 10px; color:var(--mini-bg); font-size:11px; font-weight:800; }
+.miniapp-receipt-sheet img { display:block; width:100%; max-height:82dvh; object-fit:contain; background:#f1e7ea; }
+.miniapp-receipt-sheet iframe { display:block; width:100%; height:82dvh; border:0; background:#fff; }
 .miniapp-loader { width:34px; height:34px; border:3px solid rgba(26,10,15,.12); border-top-color:var(--mini-ink); border-radius:50%; animation:miniapp-spin .8s linear infinite; }
 @keyframes miniapp-spin { to { transform:rotate(360deg); } }
 

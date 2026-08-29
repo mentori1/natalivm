@@ -175,6 +175,70 @@ export async function sendTelegramMessage(
   });
 }
 
+export async function sendTelegramMediaBytes({
+  chatId,
+  bytes,
+  fileName,
+  mimeType,
+  kind,
+  caption,
+  replyMarkup,
+}: {
+  chatId: string;
+  bytes: Uint8Array;
+  fileName: string;
+  mimeType: string;
+  kind: "photo" | "document";
+  caption?: string;
+  replyMarkup?: Record<string, unknown>;
+}) {
+  const boundary = `----vumexclusive-${Date.now().toString(16)}`;
+  const field = kind === "photo" ? "photo" : "document";
+  const method = kind === "photo" ? "sendPhoto" : "sendDocument";
+  const safeName = fileName.replace(/[\r\n"\\]/g, "_").slice(0, 120) || "receipt";
+  const fields: Array<[string, string]> = [["chat_id", chatId]];
+  if (caption) fields.push(["caption", caption]);
+  if (replyMarkup) fields.push(["reply_markup", JSON.stringify(replyMarkup)]);
+
+  const chunks: Buffer[] = [];
+  for (const [name, value] of fields) {
+    chunks.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+      ),
+    );
+  }
+  chunks.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${safeName}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    ),
+    Buffer.from(bytes),
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  );
+  const body = Buffer.concat(chunks);
+  const response = await requestTelegram(
+    `https://api.telegram.org/bot${botToken()}/${method}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+        "content-length": body.byteLength,
+      },
+    },
+    body,
+  );
+  const data = JSON.parse(response.bytes.toString("utf8")) as TelegramApiResponse<TelegramMessage>;
+  if (
+    response.status < 200 ||
+    response.status >= 300 ||
+    !data.ok ||
+    data.result === undefined
+  ) {
+    throw new Error(data.description || `Telegram API: ${method} failed`);
+  }
+  return data.result;
+}
+
 export async function sendTelegramPhotoFile(
   chatId: string,
   filePath: string,
@@ -185,28 +249,15 @@ export async function sendTelegramPhotoFile(
   const mimeType = filePath.toLowerCase().endsWith(".png")
     ? "image/png"
     : "image/jpeg";
-  const body = new FormData();
-  body.set("chat_id", chatId);
-  body.set("caption", caption);
-  body.set(
-    "photo",
-    new Blob([new Uint8Array(bytes)], { type: mimeType }),
-    basename(filePath),
-  );
-  if (replyMarkup) body.set("reply_markup", JSON.stringify(replyMarkup));
-
-  const response = await fetch(
-    `https://api.telegram.org/bot${botToken()}/sendPhoto`,
-    {
-      method: "POST",
-      body,
-    },
-  );
-  const data = (await response.json()) as TelegramApiResponse<TelegramMessage>;
-  if (!response.ok || !data.ok || data.result === undefined) {
-    throw new Error(data.description || "Telegram API: sendPhoto failed");
-  }
-  return data.result;
+  return sendTelegramMediaBytes({
+    chatId,
+    bytes,
+    fileName: basename(filePath),
+    mimeType,
+    kind: "photo",
+    caption,
+    replyMarkup,
+  });
 }
 
 export async function setTelegramProfilePhotoFile(filePath: string) {

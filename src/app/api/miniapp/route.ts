@@ -7,9 +7,15 @@ import {
   remaining,
 } from "@/lib/domain";
 import { DEFAULT_BOT_TEXT, getBotSettings } from "@/lib/bot-settings";
+import {
+  approveBookingPayment,
+  approveSubscriptionPayment,
+  rejectBookingPayment,
+  rejectSubscriptionPayment,
+} from "@/lib/payment-review";
 import { ensureDefaultPriceItems } from "@/lib/prices";
 import { createBooking } from "@/lib/telegram-client-bot";
-import { sendTelegramMessage } from "@/lib/telegram-api";
+import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import {
   bindClientWithPortalToken,
@@ -17,6 +23,21 @@ import {
 } from "@/lib/telegram-client-sync";
 
 export const dynamic = "force-dynamic";
+
+type PortalPayment = {
+  kind: "booking" | "subscription";
+  id: number;
+  title: string;
+  detail: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  hasReceipt: boolean;
+  receiptName: string | null;
+  receiptMimeType: string | null;
+  clientName?: string;
+};
 
 function identity(req: NextRequest) {
   return validateTelegramMiniAppData(
@@ -89,6 +110,106 @@ export async function GET(req: NextRequest) {
       ],
     });
     const settings = await getBotSettings();
+    const bookingPayments = await prisma.botBooking.findMany({
+      where: {
+        clientId: client.id,
+        amount: { gt: 0 },
+        status: { not: "cancelled" },
+      },
+      include: { lesson: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const subscriptionPayments = await prisma.subscriptionOrder.findMany({
+      where: {
+        clientId: client.id,
+        status: { not: "cancelled" },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    const payments: PortalPayment[] = [
+      ...bookingPayments.map((item) => ({
+        kind: "booking" as const,
+        id: item.id,
+        title: item.tariffName || "Занятие",
+        detail: `${formatDateTime(item.lesson.startsAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`,
+        amount: item.amount,
+        status: item.status,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        hasReceipt: Boolean(item.receiptFileId),
+        receiptName: item.receiptFileName,
+        receiptMimeType: item.receiptMimeType,
+      })),
+      ...subscriptionPayments.map((item) => ({
+        kind: "subscription" as const,
+        id: item.id,
+        title: item.tariffName,
+        detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+        amount: item.amount,
+        status: item.status,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        hasReceipt: Boolean(item.receiptFileId),
+        receiptName: item.receiptFileName,
+        receiptMimeType: item.receiptMimeType,
+      })),
+    ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const isAdmin = telegramAdminIds().has(String(user.id));
+    const adminBookingPayments = isAdmin
+      ? await prisma.botBooking.findMany({
+          where: {
+            receiptFileId: { not: null },
+            status: { in: ["review", "confirmed", "rejected", "expired"] },
+          },
+          include: { lesson: true, client: true },
+          orderBy: { updatedAt: "desc" },
+          take: 100,
+        })
+      : [];
+    const adminSubscriptionPayments = isAdmin
+      ? await prisma.subscriptionOrder.findMany({
+          where: {
+            receiptFileId: { not: null },
+            status: { in: ["review", "confirmed", "rejected"] },
+          },
+          include: { client: true },
+          orderBy: { updatedAt: "desc" },
+          take: 100,
+        })
+      : [];
+    const adminPayments: PortalPayment[] = [
+      ...adminBookingPayments.map((item) => ({
+        kind: "booking" as const,
+        id: item.id,
+        title: item.tariffName || "Занятие",
+        detail: `${formatDateTime(item.lesson.startsAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`,
+        amount: item.amount,
+        status: item.status,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        hasReceipt: true,
+        receiptName: item.receiptFileName,
+        receiptMimeType: item.receiptMimeType,
+        clientName: item.client?.fullName || item.displayName || "Клиент",
+      })),
+      ...adminSubscriptionPayments.map((item) => ({
+        kind: "subscription" as const,
+        id: item.id,
+        title: item.tariffName,
+        detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+        amount: item.amount,
+        status: item.status,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        hasReceipt: true,
+        receiptName: item.receiptFileName,
+        receiptMimeType: item.receiptMimeType,
+        clientName: item.client.fullName,
+      })),
+    ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
     return NextResponse.json({
       user: {
@@ -154,6 +275,11 @@ export async function GET(req: NextRequest) {
           : [],
       },
       paymentReady: Boolean(settings.paymentDetails),
+      paymentDetails: settings.paymentDetails || "",
+      payments,
+      isAdmin,
+      adminPayments,
+      adminPendingCount: adminPayments.filter((item) => item.status === "review").length,
       trainer: {
         text: settings.trainerText || DEFAULT_BOT_TEXT.trainer,
         imageUrl: "/bot-trainer.jpg",
@@ -175,16 +301,97 @@ export async function POST(req: NextRequest) {
       preferredWeekdays?: number[];
       priceItemId?: number;
       totalLessons?: number;
+      paymentKind?: "booking" | "subscription";
+      paymentId?: number;
+      decision?: "approve" | "reject";
     };
+
+    if (body.action === "reviewPayment") {
+      const adminId = String(user.id);
+      if (!telegramAdminIds().has(adminId)) throw new Error("Нет доступа");
+      const id = Number(body.paymentId);
+      if (!Number.isInteger(id) || id < 1) throw new Error("Платёж не найден");
+      if (!body.paymentKind || !body.decision) throw new Error("Действие не выбрано");
+
+      if (body.paymentKind === "booking" && body.decision === "approve") {
+        const result = await approveBookingPayment(id, adminId);
+        if (!result.ok) {
+          throw new Error(
+            result.reason === "full"
+              ? "Занятие уже прошло или мест больше нет"
+              : "Платёж уже обработан",
+          );
+        }
+        await sendTelegramMessage(
+          result.booking.telegramChatId,
+          `Оплата подтверждена. Вы записаны: ${formatDateTime(result.booking.lesson.startsAt)}, ${result.booking.lesson.type === "online" ? "онлайн" : "офлайн"}.`,
+        ).catch(() => undefined);
+        return NextResponse.json({ ok: true, message: "Оплата подтверждена" });
+      }
+
+      if (body.paymentKind === "booking" && body.decision === "reject") {
+        const settings = await getBotSettings();
+        const booking = await rejectBookingPayment(
+          id,
+          adminId,
+          settings.bookingHoldMinutes,
+        );
+        if (!booking) throw new Error("Платёж уже обработан");
+        await sendTelegramMessage(
+          booking.telegramChatId,
+          "Чек отклонён. Загрузите корректную фотографию или PDF в личном кабинете.",
+        ).catch(() => undefined);
+        return NextResponse.json({ ok: true, message: "Чек отклонён" });
+      }
+
+      if (body.paymentKind === "subscription" && body.decision === "approve") {
+        const result = await approveSubscriptionPayment(id, adminId);
+        if (!result.ok) throw new Error("Платёж уже обработан");
+        const until = new Intl.DateTimeFormat("ru-RU", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(result.expiresAt);
+        await sendTelegramMessage(
+          result.order.telegramChatId,
+          `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+        ).catch(() => undefined);
+        return NextResponse.json({ ok: true, message: "Абонемент активирован" });
+      }
+
+      if (body.paymentKind === "subscription" && body.decision === "reject") {
+        const order = await rejectSubscriptionPayment(id, adminId);
+        if (!order) throw new Error("Платёж уже обработан");
+        await sendTelegramMessage(
+          order.telegramChatId,
+          "Чек отклонён. Загрузите корректную фотографию или PDF в личном кабинете.",
+        ).catch(() => undefined);
+        return NextResponse.json({ ok: true, message: "Чек отклонён" });
+      }
+    }
 
     if (body.action === "book") {
       if (!Number.isInteger(body.lessonId) || Number(body.lessonId) < 1) {
         throw new Error("Занятие не выбрано");
       }
-      await createBooking(String(user.id), user, Number(body.lessonId));
+      await createBooking(String(user.id), user, Number(body.lessonId), {
+        notifyChat: false,
+      });
+      const booking = await prisma.botBooking.findFirst({
+        where: {
+          clientId: client.id,
+          lessonId: Number(body.lessonId),
+          status: { in: ["awaiting_receipt", "review", "confirmed"] },
+        },
+        orderBy: { createdAt: "desc" },
+      });
       return NextResponse.json({
         ok: true,
-        message: "Заявка создана. Подтверждение и оплата отправлены в чат с ботом.",
+        paymentRequired: booking?.status === "awaiting_receipt" || booking?.status === "review",
+        message:
+          booking?.status === "awaiting_receipt"
+            ? "Место сохранено. Оплатите и прикрепите чек."
+            : "Вы записаны на занятие",
       });
     }
 
@@ -238,7 +445,7 @@ export async function POST(req: NextRequest) {
         },
         data: { status: "cancelled" },
       });
-      const order = await prisma.subscriptionOrder.create({
+      await prisma.subscriptionOrder.create({
         data: {
           clientId: client.id,
           priceItemId: priceItem.id,
@@ -252,13 +459,10 @@ export async function POST(req: NextRequest) {
           amount: priceItem.price * totalLessons,
         },
       });
-      await sendTelegramMessage(
-        String(user.id),
-        `Абонемент: ${order.tariffName}\n${order.totalLessons} занятий · ${order.amount.toLocaleString("ru-RU")} ₽\n\nРеквизиты:\n${settings.paymentDetails}\n\nПосле оплаты отправьте сюда чек PDF или фотографией.`,
-      );
       return NextResponse.json({
         ok: true,
-        message: "Реквизиты отправлены в чат с ботом. После оплаты пришлите туда чек.",
+        paymentRequired: true,
+        message: "Заявка создана. Оплатите и прикрепите чек в личном кабинете.",
       });
     }
 
