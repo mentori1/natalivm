@@ -521,6 +521,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, message: "Запись перенесена без списания" });
     }
 
+    if (body.action === "cancelPayment") {
+      const id = Number(body.paymentId);
+      if (!Number.isInteger(id) || id < 1 || !body.paymentKind) {
+        throw new Error("Покупка не найдена");
+      }
+      let cancelled = 0;
+      if (body.paymentKind === "booking") {
+        const result = await prisma.botBooking.updateMany({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          data: { status: "cancelled" },
+        });
+        cancelled = result.count;
+      } else if (body.paymentKind === "subscription") {
+        const result = await prisma.subscriptionOrder.updateMany({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          data: { status: "cancelled" },
+        });
+        cancelled = result.count;
+      } else if (body.paymentKind === "trainer") {
+        const result = await prisma.trainerOrder.updateMany({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          data: { status: "cancelled" },
+        });
+        cancelled = result.count;
+      }
+      if (!cancelled) {
+        throw new Error("Эту покупку уже нельзя отменить: чек на проверке или оплата подтверждена");
+      }
+      return NextResponse.json({ ok: true, message: "Покупка и бронь места отменены" });
+    }
+
     if (body.action === "reviewPayment") {
       const adminId = String(user.id);
       if (!telegramAdminIds().has(adminId)) throw new Error("Нет доступа");

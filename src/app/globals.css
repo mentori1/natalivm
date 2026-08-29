@@ -37,6 +37,8 @@
 .miniapp-hero-glass { width:100%; border:1px solid rgba(255,255,255,.38); border-radius:17px; background:rgba(246,230,234,.72); color:var(--mini-ink); padding:18px; box-shadow:0 10px 28px rgba(26,10,15,.16); backdrop-filter:blur(18px) saturate(1.12); -webkit-backdrop-filter:blur(18px) saturate(1.12); }
 .miniapp-hero-button { border:1px solid rgba(255,255,255,.52); border-radius:13px; background:rgba(255,249,251,.44); padding:11px 15px; color:var(--mini-ink); font-size:14px; font-weight:750; box-shadow:inset 0 1px 0 rgba(255,255,255,.46); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); transition:background .16s ease, transform .16s ease; }
 .miniapp-hero-button:active { background:rgba(255,249,251,.68); transform:scale(.98); }
+.miniapp-hero.is-clickable { cursor:pointer; transition:transform .18s ease,box-shadow .18s ease; }
+.miniapp-hero.is-clickable:active { transform:scale(.988); box-shadow:0 10px 26px rgba(26,10,15,.14); }
 .miniapp-kicker { color:var(--mini-accent); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 .miniapp-title { margin-top:3px; font-size:24px; font-weight:800; }
 .miniapp-link { color:var(--mini-accent); font-size:13px; font-weight:700; }
@@ -45,6 +47,7 @@
 .miniapp-row { display:flex; align-items:center; gap:14px; padding:16px; }
 .miniapp-price, .miniapp-subscription { padding:18px; }
 .miniapp-planned-card, .miniapp-individual-plan { padding:17px; }
+.miniapp-planned-card.is-highlighted { border-color:rgba(143,41,71,.35); box-shadow:0 0 0 3px rgba(143,41,71,.1),0 12px 28px rgba(26,10,15,.08); }
 .miniapp-reschedule-box { border:1px solid rgba(26,10,15,.09); border-radius:14px; background:rgba(246,230,234,.48); padding:12px; }
 .miniapp-reschedule-box label { display:block; margin-bottom:7px; color:rgba(26,10,15,.58); font-size:11px; font-weight:800; text-transform:uppercase; }
 .miniapp-reschedule-box input, .miniapp-reschedule-box select, .miniapp-individual-plan input { width:100%; min-height:44px; border:1px solid rgba(26,10,15,.14); border-radius:11px; background:var(--mini-surface); padding:9px 11px; color:var(--mini-ink); font-size:13px; font-weight:650; }
@@ -109,6 +112,8 @@
 .miniapp-overdue { display:inline-flex; border-radius:999px; background:#f4d7c8; padding:4px 7px; color:#8b3c24; font-size:10px; font-weight:850; text-transform:uppercase; }
 .miniapp-decline-button, .miniapp-approve-button { min-height:45px; border-radius:13px; font-size:13px; font-weight:850; }
 .miniapp-decline-button { border:1px solid rgba(146,47,47,.24); background:#fff0f0; color:#922f2f; }
+.miniapp-cancel-purchase { min-height:43px; border:1px solid rgba(146,47,47,.2); border-radius:13px; background:transparent; color:#922f2f; font-size:12px; font-weight:800; }
+.miniapp-cancel-purchase:disabled { opacity:.42; }
 .miniapp-approve-button { background:var(--mini-ink); color:var(--mini-bg); }
 .miniapp-decline-button:disabled, .miniapp-approve-button:disabled { opacity:.45; }
 .miniapp-receipt-modal { position:fixed; z-index:150; inset:0; display:flex; align-items:flex-end; justify-content:center; background:rgba(26,10,15,.55); padding-top:env(safe-area-inset-top); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }

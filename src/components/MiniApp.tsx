@@ -235,6 +235,7 @@ export function MiniApp() {
   const [editDates, setEditDates] = useState<Record<number, string>>({});
   const [editingLesson, setEditingLesson] = useState<number | null>(null);
   const [transferTargets, setTransferTargets] = useState<Record<number, number>>({});
+  const [highlightedLessonId, setHighlightedLessonId] = useState<number | null>(null);
   const [selectedBookingPriceId, setSelectedBookingPriceId] = useState<number | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<{
     url: string;
@@ -615,7 +616,23 @@ export function MiniApp() {
       <div className="px-5">
         {tab === "home" && (
           <div className="space-y-6">
-            <section className="miniapp-hero">
+            <section
+              className={`miniapp-hero ${nextBooking ? "is-clickable" : ""}`}
+              role={nextBooking ? "button" : undefined}
+              tabIndex={nextBooking ? 0 : undefined}
+              aria-label={nextBooking ? "Открыть ближайшее занятие" : undefined}
+              onClick={nextBooking ? () => {
+                setHighlightedLessonId(nextBooking.lessonId);
+                setTab("schedule");
+              } : undefined}
+              onKeyDown={nextBooking ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setHighlightedLessonId(nextBooking.lessonId);
+                  setTab("schedule");
+                }
+              } : undefined}
+            >
               <div className="miniapp-hero-glass">
                 <p className="text-xs font-semibold uppercase opacity-60">Ближайшее занятие</p>
                 {nextBooking ? (
@@ -716,9 +733,12 @@ export function MiniApp() {
                     candidate.type === lesson.type &&
                     candidate.id !== lesson.lessonId,
                 );
-                const selectedTarget = transferTargets[lesson.attendanceId] || targets[0]?.id;
+                const selectedTarget = transferTargets[lesson.attendanceId] || 0;
                 return (
-                  <article key={lesson.attendanceId} className="miniapp-planned-card">
+                  <article
+                    key={lesson.attendanceId}
+                    className={`miniapp-planned-card ${highlightedLessonId === lesson.lessonId ? "is-highlighted" : ""}`}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap gap-1.5">
@@ -805,7 +825,11 @@ export function MiniApp() {
                       <div className="miniapp-reschedule-box mt-4">
                         {targets.length ? (
                           <>
-                            <label>Перенести без списания</label>
+                            <p className="font-bold">Перенести запись</p>
+                            <p className="mt-1 text-xs leading-relaxed opacity-55">
+                              Выберите, на какую новую дату перенести занятие. Списания не будет.
+                            </p>
+                            <label className="mt-3">Куда перенести</label>
                             <select
                               value={selectedTarget || ""}
                               onChange={(event) => setTransferTargets((old) => ({
@@ -813,6 +837,7 @@ export function MiniApp() {
                                 [lesson.attendanceId]: Number(event.target.value),
                               }))}
                             >
+                              <option value="">Выберите новую дату и время</option>
                               {targets.map((target) => (
                                 <option key={target.id} value={target.id}>
                                   {formatScheduleDate(target.startsAt)}
@@ -832,7 +857,7 @@ export function MiniApp() {
                                 }
                               }}
                             >
-                              Перенести запись
+                              {selectedTarget ? "Перенести на выбранную дату" : "Сначала выберите дату"}
                             </button>
                           </>
                         ) : (
@@ -1105,6 +1130,22 @@ export function MiniApp() {
                           }}
                         />
                       </label>
+                      <button
+                        type="button"
+                        disabled={busy || Boolean(uploadingPayment)}
+                        className="miniapp-cancel-purchase mt-2 w-full"
+                        onClick={() => {
+                          if (window.confirm("Отменить эту покупку? Неоплаченная заявка и бронь места будут отменены.")) {
+                            void action({
+                              action: "cancelPayment",
+                              paymentKind: payment.kind,
+                              paymentId: payment.id,
+                            });
+                          }
+                        }}
+                      >
+                        Отменить покупку
+                      </button>
                     </article>
                   );
                 })}
