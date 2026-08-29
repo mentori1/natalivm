@@ -165,6 +165,12 @@ const PAYMENT_STATUS: Record<string, string> = {
   credit: "В запасе",
 };
 
+const PRICE_KIND_ORDER: Record<string, number> = {
+  trial: 0,
+  single: 1,
+  subscription: 2,
+};
+
 function formatDate(value: string, withTime = false) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
@@ -549,9 +555,12 @@ export function MiniApp() {
     () => data?.lessons.filter((lesson) => lesson.type === type) || [],
     [data, type],
   );
-  const filteredPrices = data?.prices.filter(
+  const filteredPrices = (data?.prices.filter(
     (price) => price.type === priceType && price.format === priceFormat,
-  ) || [];
+  ) || []).sort(
+    (a, b) =>
+      (PRICE_KIND_ORDER[a.kind] ?? 99) - (PRICE_KIND_ORDER[b.kind] ?? 99),
+  );
   const selectedBookingPrice = data?.prices.find(
     (price) => price.id === selectedBookingPriceId,
   );
