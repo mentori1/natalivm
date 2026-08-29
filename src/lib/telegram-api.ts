@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { request as httpsRequest, type RequestOptions } from "node:https";
 import { basename } from "node:path";
 
 export type TelegramUser = {
@@ -86,6 +87,44 @@ function botToken() {
   return token;
 }
 
+function requestTelegram(
+  url: string,
+  options: RequestOptions = {},
+  body?: Uint8Array,
+) {
+  return new Promise<{
+    status: number;
+    headers: Record<string, string | string[] | undefined>;
+    bytes: Buffer;
+  }>((resolve, reject) => {
+    const request = httpsRequest(
+      url,
+      {
+        ...options,
+        family: 4,
+        timeout: 15_000,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          resolve({
+            status: response.statusCode ?? 0,
+            headers: response.headers,
+            bytes: Buffer.concat(chunks),
+          });
+        });
+      },
+    );
+    request.on("timeout", () => {
+      request.destroy(new Error("Telegram API: превышено время ожидания"));
+    });
+    request.on("error", reject);
+    if (body) request.write(body);
+    request.end();
+  });
+}
+
 export function telegramAdminIds() {
   return new Set(
     (process.env.TELEGRAM_ADMIN_IDS ?? "")
@@ -105,13 +144,20 @@ export async function telegramApi<T>(
   method: string,
   payload: Record<string, unknown> = {},
 ): Promise<T> {
-  const response = await fetch(`https://api.telegram.org/bot${botToken()}/${method}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = (await response.json()) as TelegramApiResponse<T>;
-  if (!response.ok || !data.ok || data.result === undefined) {
+  const body = Buffer.from(JSON.stringify(payload));
+  const response = await requestTelegram(
+    `https://api.telegram.org/bot${botToken()}/${method}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": body.byteLength,
+      },
+    },
+    body,
+  );
+  const data = JSON.parse(response.bytes.toString("utf8")) as TelegramApiResponse<T>;
+  if (response.status < 200 || response.status >= 300 || !data.ok || data.result === undefined) {
     throw new Error(data.description || `Telegram API: ${method} failed`);
   }
   return data.result;
@@ -192,12 +238,17 @@ export async function downloadTelegramFile(fileId: string) {
     file_id: fileId,
   });
   if (!file.file_path) throw new Error("Telegram не вернул путь к файлу");
-  const response = await fetch(
+  const response = await requestTelegram(
     `https://api.telegram.org/file/bot${botToken()}/${file.file_path}`,
   );
-  if (!response.ok) throw new Error("Не удалось загрузить файл из Telegram");
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error("Не удалось загрузить файл из Telegram");
+  }
   return {
-    bytes: await response.arrayBuffer(),
-    contentType: response.headers.get("content-type") || "image/jpeg",
+    bytes: response.bytes,
+    contentType:
+      (Array.isArray(response.headers["content-type"])
+        ? response.headers["content-type"][0]
+        : response.headers["content-type"]) || "image/jpeg",
   };
 }
