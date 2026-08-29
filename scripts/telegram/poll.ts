@@ -56,7 +56,7 @@ async function main() {
     try {
       const updates = await telegramApi<Update[]>("getUpdates", {
         offset,
-        timeout: 25,
+        timeout: 10,
         allowed_updates: [
           "message",
           "channel_post",
