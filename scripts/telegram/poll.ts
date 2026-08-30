@@ -14,20 +14,13 @@ async function main() {
   type Update = Parameters<typeof handleTelegramUpdate>[0];
 
   const me = await telegramApi<{ username?: string }>("getMe");
-  const miniAppUrl = process.env.MINIAPP_URL?.trim();
-  if (miniAppUrl) {
-    await telegramApi<boolean>("setChatMenuButton", {
-      menu_button: {
-        type: "web_app",
-        text: "Личный кабинет",
-        web_app: { url: miniAppUrl },
-      },
-    }).catch((error) => {
-      console.error(
-        `Не удалось добавить кнопку Mini App: ${error instanceof Error ? error.message : error}`,
-      );
-    });
-  }
+  await telegramApi<boolean>("setChatMenuButton", {
+    menu_button: { type: "commands" },
+  }).catch((error) => {
+    console.error(
+      `Не удалось обновить кнопку меню: ${error instanceof Error ? error.message : error}`,
+    );
+  });
   await syncTelegramBotProfile().catch((error) => {
     console.error(
       `Не удалось обновить профиль бота: ${error instanceof Error ? error.message : error}`,

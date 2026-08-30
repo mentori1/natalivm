@@ -33,6 +33,12 @@ import {
   type TelegramMessage,
   type TelegramUser,
 } from "@/lib/telegram-api";
+import {
+  hasRequiredSubscription,
+  requiredSubscriptionAccess,
+  setClientCabinetMenu,
+  subscriptionChannelUrl,
+} from "@/lib/telegram-subscription";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -260,24 +266,14 @@ async function sendWelcome(chatId: string, userId?: string) {
   }
   const copy = await getBotCopy();
   const miniAppUrl = process.env.MINIAPP_URL?.trim();
-  if (miniAppUrl) {
-    await telegramApi<boolean>("setChatMenuButton", {
-      chat_id: chatId,
-      menu_button: {
-        type: "web_app",
-        text: "Личный кабинет",
-        web_app: { url: miniAppUrl },
-      },
-    }).catch(() => undefined);
+  const subscribed = !userId ||
+    (await requiredSubscriptionAccess(userId, settings)).subscribed;
+  if (userId) {
+    await setClientCabinetMenu(chatId, subscribed).catch(() => undefined);
   }
-
-  const subscribed =
-    !userId ||
-    telegramAdminIds().has(userId) ||
-    (await hasRequiredSubscription(userId));
   const rows: { text: string; url?: string; callback_data?: string; web_app?: { url: string } }[][] = [];
   if (!subscribed) {
-    const url = channelUrl(
+    const url = subscriptionChannelUrl(
       settings.requiredChannelChatId,
       settings.requiredChannelUrl,
     );
@@ -301,30 +297,10 @@ async function sendWelcome(chatId: string, userId?: string) {
   ).catch(() => replaceScreen(chatId, text, welcomeMarkup));
 }
 
-function channelUrl(chatId: string | null, configuredUrl: string | null) {
-  if (configuredUrl) return configuredUrl;
-  if (chatId?.startsWith("@")) return `https://t.me/${chatId.slice(1)}`;
-  return null;
-}
-
-export async function hasRequiredSubscription(userId: string) {
-  const settings = await getBotSettings();
-  if (!settings.requiredChannelChatId) return true;
-  try {
-    const member = await telegramApi<{ status: string }>("getChatMember", {
-      chat_id: settings.requiredChannelChatId,
-      user_id: Number(userId),
-    });
-    return !["left", "kicked"].includes(member.status);
-  } catch {
-    return false;
-  }
-}
-
 async function askForSubscription(chatId: string) {
   const settings = await getBotSettings();
   const copy = await getBotCopy();
-  const url = channelUrl(
+  const url = subscriptionChannelUrl(
     settings.requiredChannelChatId,
     settings.requiredChannelUrl,
   );

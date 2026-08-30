@@ -126,6 +126,7 @@ declare global {
         setHeaderColor(color: string): void;
         setBackgroundColor(color: string): void;
         setBottomBarColor?(color: string): void;
+        openTelegramLink?(url: string): void;
         HapticFeedback?: { impactOccurred(style: string): void };
       };
     };
@@ -233,6 +234,9 @@ function telegramInitData() {
 
 export function MiniApp() {
   const [data, setData] = useState<PortalData | null>(null);
+  const [subscriptionGate, setSubscriptionGate] = useState<{
+    subscribeUrl: string | null;
+  } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -407,8 +411,18 @@ export function MiniApp() {
         headers: { "x-telegram-init-data": telegramInitData() },
         cache: "no-store",
       });
-      const result = (await response.json()) as PortalData & { error?: string };
+      const result = (await response.json()) as PortalData & {
+        error?: string;
+        code?: string;
+        subscribeUrl?: string | null;
+      };
+      if (response.status === 403 && result.code === "subscription_required") {
+        setData(null);
+        setSubscriptionGate({ subscribeUrl: result.subscribeUrl ?? null });
+        return;
+      }
       if (!response.ok) throw new Error(result.error || "Не удалось открыть кабинет");
+      setSubscriptionGate(null);
       setData(result);
       if (result.isAdmin) setTab("admin");
       setLessonCounts(
@@ -464,7 +478,14 @@ export function MiniApp() {
         message?: string;
         error?: string;
         paymentRequired?: boolean;
+        code?: string;
+        subscribeUrl?: string | null;
       };
+      if (response.status === 403 && result.code === "subscription_required") {
+        setData(null);
+        setSubscriptionGate({ subscribeUrl: result.subscribeUrl ?? null });
+        return null;
+      }
       if (!response.ok) throw new Error(result.error || "Не удалось выполнить действие");
       setNotice(result.message || "Готово");
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light");
@@ -496,7 +517,17 @@ export function MiniApp() {
         headers: { "x-telegram-init-data": telegramInitData() },
         body: form,
       });
-      const result = (await response.json()) as { message?: string; error?: string };
+      const result = (await response.json()) as {
+        message?: string;
+        error?: string;
+        code?: string;
+        subscribeUrl?: string | null;
+      };
+      if (response.status === 403 && result.code === "subscription_required") {
+        setData(null);
+        setSubscriptionGate({ subscribeUrl: result.subscribeUrl ?? null });
+        return;
+      }
       if (!response.ok) throw new Error(result.error || "Не удалось отправить чек");
       setNotice(result.message || "Чек отправлен на проверку");
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light");
@@ -594,6 +625,46 @@ export function MiniApp() {
     return (
       <main className="miniapp-shell grid min-h-[100dvh] place-items-center px-6">
         <div className="miniapp-loader" aria-label="Загрузка" />
+      </main>
+    );
+  }
+
+  if (subscriptionGate) {
+    return (
+      <main className="miniapp-shell grid min-h-[100dvh] place-items-center px-5 text-center">
+        <div className="miniapp-subscription-gate">
+          <p className="miniapp-kicker">Доступ к кабинету</p>
+          <h1>Сначала подпишитесь на канал</h1>
+          <p>
+            Личный кабинет VUMEXCLUSIVE откроется после подтверждения подписки.
+          </p>
+          <div className="mt-6 grid gap-3">
+            {subscriptionGate.subscribeUrl && (
+              <button
+                type="button"
+                className="miniapp-primary w-full"
+                onClick={() => {
+                  const url = subscriptionGate.subscribeUrl;
+                  if (!url) return;
+                  if (window.Telegram?.WebApp?.openTelegramLink) {
+                    window.Telegram.WebApp.openTelegramLink(url);
+                  } else {
+                    window.location.href = url;
+                  }
+                }}
+              >
+                Подписаться на канал
+              </button>
+            )}
+            <button
+              type="button"
+              className="miniapp-glass-pill w-full"
+              onClick={() => void load()}
+            >
+              Проверить подписку
+            </button>
+          </div>
+        </div>
       </main>
     );
   }

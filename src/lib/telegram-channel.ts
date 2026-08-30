@@ -13,6 +13,7 @@ import {
   type TelegramChatMemberUpdated,
   type TelegramMessage,
 } from "@/lib/telegram-api";
+import { setClientCabinetMenu } from "@/lib/telegram-subscription";
 
 const CHANNEL_START_PREFIX = "channel_";
 
@@ -61,6 +62,7 @@ export async function handleRequiredChannelMemberUpdate(
 
   const name = telegramDisplayName(user) || "Имя не указано";
   const username = user.username ? `@${user.username}` : "не указан";
+  await setClientCabinetMenu(String(user.id), isMember).catch(() => undefined);
   await notifyAdmins(
     [
       isMember

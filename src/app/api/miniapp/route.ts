@@ -21,10 +21,10 @@ import { ensureDefaultPriceItems } from "@/lib/prices";
 import {
   createBooking,
   hasUsedTrial,
-  requireSubscription,
 } from "@/lib/telegram-client-bot";
 import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
+import { requiredSubscriptionAccess } from "@/lib/telegram-subscription";
 import {
   cancelGroupLesson,
   cancelIndividualLesson,
@@ -73,12 +73,19 @@ function identity(req: NextRequest) {
   );
 }
 
-async function resolveClient(req: NextRequest) {
-  const auth = identity(req);
+async function resolveClient(auth: ReturnType<typeof identity>) {
   const client = auth.startParam?.startsWith("link_")
     ? await bindClientWithPortalToken(auth.startParam.slice(5), auth.user)
     : await syncTelegramClient(auth.user);
   return { ...auth, client };
+}
+
+function subscriptionRequiredPayload(subscribeUrl: string | null) {
+  return {
+    error: "Подпишитесь на канал @VUMEXCLUSIVE, чтобы открыть личный кабинет",
+    code: "subscription_required",
+    subscribeUrl,
+  };
 }
 
 function errorResponse(error: unknown, status = 400) {
@@ -90,7 +97,15 @@ function errorResponse(error: unknown, status = 400) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { user, client } = await resolveClient(req);
+    const auth = identity(req);
+    const access = await requiredSubscriptionAccess(String(auth.user.id));
+    if (!access.subscribed) {
+      return NextResponse.json(
+        subscriptionRequiredPayload(access.subscribeUrl),
+        { status: 403 },
+      );
+    }
+    const { user, client } = await resolveClient(auth);
     const now = currentMoscowWallClockDate();
     await ensureDefaultPriceItems();
 
@@ -627,7 +642,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, client } = await resolveClient(req);
+    const auth = identity(req);
+    const access = await requiredSubscriptionAccess(String(auth.user.id));
+    if (!access.subscribed) {
+      return NextResponse.json(
+        subscriptionRequiredPayload(access.subscribeUrl),
+        { status: 403 },
+      );
+    }
+    const { user, client } = await resolveClient(auth);
     const body = (await req.json()) as {
       action?: string;
       lessonId?: number;
@@ -641,13 +664,6 @@ export async function POST(req: NextRequest) {
       subscriptionId?: number;
       startsAt?: string;
     };
-
-    if (["book", "purchaseTariff"].includes(body.action || "")) {
-      const subscribed = await requireSubscription(String(user.id), String(user.id));
-      if (!subscribed) {
-        throw new Error("Сначала подпишитесь на канал @VUMEXCLUSIVE и повторите действие");
-      }
-    }
 
     if (body.action === "scheduleIndividual") {
       const subscriptionId = Number(body.subscriptionId);
