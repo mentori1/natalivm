@@ -108,6 +108,8 @@ model Subscription {
   frozen         Boolean   @default(false)
   frozenUntil    DateTime? // до какого числа заморожен
   freezeReason   String? // причина заморозки
+  availabilitySlots String? // JSON: удобные дни недели и диапазоны времени для индивидуальных занятий
+  availabilityUpdatedAt DateTime? // когда клиент последний раз обновлял пожелания
   // active | ending | finished_lessons | finished_term | frozen
   status         String    @default("active")
   createdAt      DateTime  @default(now())

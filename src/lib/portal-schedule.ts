@@ -57,6 +57,7 @@ export async function scheduleIndividualLesson(
   clientId: number,
   subscriptionId: number,
   startsAt: Date,
+  options: { notify?: "admins" | "client" } = {},
 ) {
   validateIndividualStart(startsAt);
   const result = await prisma.$transaction(async (tx) => {
@@ -126,11 +127,25 @@ export async function scheduleIndividualLesson(
         },
       });
     }
-    return { lesson, clientName: subscription.client.fullName, type: subscription.type };
+    return {
+      lesson,
+      clientName: subscription.client.fullName,
+      type: subscription.type,
+      telegramUserId: subscription.client.telegramUserId,
+    };
   });
-  await notifyAdmins(
-    `${result.clientName} запланировала индивидуальное занятие: ${formatDateTime(result.lesson.startsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.`,
-  );
+  if (options.notify === "client" && result.telegramUserId) {
+    await Promise.allSettled([
+      sendTelegramMessage(
+        result.telegramUserId,
+        `Наталья поставила индивидуальное занятие: ${formatDateTime(result.lesson.startsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}. Оно уже появилось в вашем личном кабинете.`,
+      ),
+    ]);
+  } else {
+    await notifyAdmins(
+      `${result.clientName} запланировала индивидуальное занятие: ${formatDateTime(result.lesson.startsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.`,
+    );
+  }
   return result;
 }
 

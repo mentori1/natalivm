@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, usesPostgres } from "@/lib/db";
 import { findClientDuplicates } from "@/lib/queries";
+import { scheduleIndividualLesson } from "@/lib/portal-schedule";
 import {
   currentMoscowWallClockDate,
   derivedSubStatus,
@@ -360,6 +361,20 @@ export async function createSubscription(fd: FormData) {
 
     return subscription;
   });
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/lessons");
+  revalidatePath("/");
+}
+
+export async function scheduleIndividualFromCrm(fd: FormData) {
+  const subscriptionId = num(fd, "subscriptionId");
+  const clientId = num(fd, "clientId");
+  const startsAt = wallClockDateTimeOrNull(fd, "startsAt");
+  if (!subscriptionId || !clientId || !startsAt) return;
+  await scheduleIndividualLesson(clientId, subscriptionId, startsAt, {
+    notify: "client",
+  });
+  revalidatePath(`/subscriptions/${subscriptionId}`);
   revalidatePath(`/clients/${clientId}`);
   revalidatePath("/lessons");
   revalidatePath("/");

@@ -35,6 +35,10 @@ import { DeleteClientButton } from "@/components/DeleteClientButton";
 import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 import { PortalLinkCard } from "@/components/PortalLinkCard";
 import {
+  formatIndividualAvailability,
+  parseIndividualAvailability,
+} from "@/lib/individual-availability";
+import {
   IconArrowLeft,
   IconPhone,
   IconSend,
@@ -223,6 +227,7 @@ export default async function ClientCardPage({
             {client.subscriptions.map((s) => {
               const st = derivedSubStatus(s);
               const left = remaining(s);
+              const availability = parseIndividualAvailability(s.availabilitySlots);
               const pct =
                 s.unlimited
                   ? 100
@@ -265,6 +270,14 @@ export default async function ClientCardPage({
                         : "бартер"}{" "}
                       · {s.unlimited ? "без срока" : `до ${formatDate(s.expiresAt)}`}
                     </p>
+                    {s.format === "individual" && (
+                      <p className="mt-2 rounded-lg bg-brand-tint px-3 py-2 text-xs text-ink">
+                        <span className="font-semibold">Удобное время: </span>
+                        {availability.length
+                          ? formatIndividualAvailability(availability)
+                          : "клиент пока не указал"}
+                      </p>
+                    )}
                   </Link>
                 </Card>
               );

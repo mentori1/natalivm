@@ -6,6 +6,7 @@ import {
   unfreezeSubscription,
   deleteSubscription,
   setUsedLessons,
+  scheduleIndividualFromCrm,
 } from "@/lib/actions";
 import {
   SUB_TYPE,
@@ -24,6 +25,10 @@ import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { VisitCalendar } from "@/components/VisitCalendar";
 import { ConfirmActionForm } from "@/components/ConfirmActionForm";
+import {
+  INDIVIDUAL_WEEKDAYS,
+  parseIndividualAvailability,
+} from "@/lib/individual-availability";
 import {
   IconArrowLeft,
   IconSnow,
@@ -86,6 +91,7 @@ export default async function SubscriptionPage({
 
   const recorded = history.length;
   const untracked = Math.max(0, sub.usedLessons - recorded);
+  const availability = parseIndividualAvailability(sub.availabilitySlots);
 
   return (
     <div className="space-y-7">
@@ -146,6 +152,77 @@ export default async function SubscriptionPage({
           <Row label="Действует до" value={sub.unlimited ? "Без срока" : formatDate(sub.expiresAt)} />
         </div>
       </Card>
+
+      {sub.format === "individual" && (
+        <section>
+          <SectionTitle>Планирование занятий</SectionTitle>
+          <Card className="space-y-5 p-5">
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                Удобные дни и время клиента
+              </p>
+              {availability.length ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {availability.map((slot) => {
+                    const day = INDIVIDUAL_WEEKDAYS.find(
+                      (item) => item.value === slot.weekday,
+                    );
+                    return (
+                      <div
+                        key={slot.weekday}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-brand-tint px-3 py-2.5"
+                      >
+                        <span className="text-sm font-semibold text-ink">
+                          {day?.label}
+                        </span>
+                        <span className="text-sm text-muted">
+                          {slot.from}–{slot.to}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted">
+                  Клиент пока не указал пожелания в личном кабинете.
+                </p>
+              )}
+              {sub.availabilityUpdatedAt && (
+                <p className="mt-2 text-xs text-muted">
+                  Обновлено {formatDateTime(sub.availabilityUpdatedAt)}
+                </p>
+              )}
+            </div>
+
+            <form
+              action={scheduleIndividualFromCrm}
+              className="border-t border-line pt-4"
+            >
+              <input type="hidden" name="subscriptionId" value={sub.id} />
+              <input type="hidden" name="clientId" value={sub.clientId} />
+              <div className="flex flex-wrap items-end gap-3">
+                <Field
+                  label="Конкретная дата и время"
+                  hint="После сохранения занятие появится в расписании"
+                >
+                  <Input
+                    name="startsAt"
+                    type="datetime-local"
+                    required
+                    className="min-w-56"
+                  />
+                </Field>
+                <SubmitButton size="md" pendingText="Ставлю…">
+                  Поставить занятие
+                </SubmitButton>
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                Клиент получит сообщение в Telegram, если кабинет уже привязан.
+              </p>
+            </form>
+          </Card>
+        </section>
+      )}
 
       {/* Отметить посещения: календарь + ручная правка */}
       <section>

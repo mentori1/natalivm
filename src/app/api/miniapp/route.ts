@@ -26,10 +26,14 @@ import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import { requiredSubscriptionAccess } from "@/lib/telegram-subscription";
 import {
+  formatIndividualAvailability,
+  normalizeIndividualAvailability,
+  parseIndividualAvailability,
+} from "@/lib/individual-availability";
+import {
   cancelGroupLesson,
   cancelIndividualLesson,
   rescheduleIndividualLesson,
-  scheduleIndividualLesson,
   transferGroupLesson,
 } from "@/lib/portal-schedule";
 import {
@@ -566,6 +570,8 @@ export async function GET(req: NextRequest) {
         scheduledLessons: scheduledAttendances.filter(
           (attendance) => attendance.plannedSubscriptionId === item.id,
         ).length,
+        availability: parseIndividualAvailability(item.availabilitySlots),
+        availabilityUpdatedAt: item.availabilityUpdatedAt?.toISOString() ?? null,
       })),
       hasSubscriptionHistory,
       bookingCredits: bookingPayments
@@ -663,16 +669,52 @@ export async function POST(req: NextRequest) {
       targetLessonId?: number;
       subscriptionId?: number;
       startsAt?: string;
+      availability?: unknown;
     };
 
-    if (body.action === "scheduleIndividual") {
+    if (body.action === "saveIndividualAvailability") {
       const subscriptionId = Number(body.subscriptionId);
-      const startsAt = new Date(`${String(body.startsAt || "")}Z`);
       if (!Number.isInteger(subscriptionId) || subscriptionId < 1) {
         throw new Error("Абонемент не выбран");
       }
-      await scheduleIndividualLesson(client.id, subscriptionId, startsAt);
-      return NextResponse.json({ ok: true, message: "Занятие добавлено в расписание" });
+      const subscription = await prisma.subscription.findFirst({
+        where: { id: subscriptionId, clientId: client.id },
+        include: { client: { select: { fullName: true } } },
+      });
+      if (!subscription || subscription.format !== "individual") {
+        throw new Error("Индивидуальный абонемент не найден");
+      }
+      const status = derivedSubStatus(subscription, currentMoscowWallClockDate());
+      if (status === "finished_lessons" || status === "finished_term") {
+        throw new Error("Этот абонемент уже закончился");
+      }
+      const availability = normalizeIndividualAvailability(body.availability);
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          availabilitySlots: availability.length
+            ? JSON.stringify(availability)
+            : null,
+          availabilityUpdatedAt: new Date(),
+        },
+      });
+      const summary = availability.length
+        ? formatIndividualAvailability(availability)
+        : "пожелания очищены";
+      await Promise.allSettled(
+        [...telegramAdminIds()].map((chatId) =>
+          sendTelegramMessage(
+            chatId,
+            `${subscription.client.fullName} обновила удобное время для индивидуальных занятий (${subscription.type === "online" ? "онлайн" : "офлайн"}): ${summary}.`,
+          ),
+        ),
+      );
+      return NextResponse.json({
+        ok: true,
+        message: availability.length
+          ? "Удобные дни сохранены. Преподаватель предложит конкретное время"
+          : "Пожелания по времени очищены",
+      });
     }
 
     if (body.action === "cancelIndividual") {

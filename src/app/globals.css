@@ -79,6 +79,25 @@
 .miniapp-day.active { background:var(--mini-ink); color:var(--mini-bg); }
 .miniapp-progress { height:6px; overflow:hidden; border-radius:999px; background:rgba(26,10,15,.1); }
 .miniapp-progress span { display:block; height:100%; border-radius:inherit; background:var(--mini-accent); }
+.miniapp-availability { margin-top:15px; border-top:1px solid rgba(26,10,15,.1); padding-top:13px; }
+.miniapp-availability summary { display:flex; cursor:pointer; list-style:none; align-items:center; justify-content:space-between; gap:12px; }
+.miniapp-availability summary::-webkit-details-marker { display:none; }
+.miniapp-availability summary > span { display:flex; min-width:0; flex-direction:column; gap:2px; }
+.miniapp-availability summary b { font-size:13px; }
+.miniapp-availability summary small { color:rgba(26,10,15,.55); font-size:11px; }
+.miniapp-availability summary i { flex:0 0 auto; font-size:20px; font-style:normal; line-height:1; transition:transform .18s ease; }
+.miniapp-availability[open] summary i { transform:rotate(180deg); }
+.miniapp-availability-body { display:grid; gap:13px; padding-top:14px; }
+.miniapp-availability-body > p { color:rgba(26,10,15,.62); font-size:12px; line-height:1.5; }
+.miniapp-availability-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; }
+.miniapp-availability-days button { aspect-ratio:1; border:1px solid rgba(26,10,15,.12); border-radius:11px; background:rgba(246,230,234,.56); color:rgba(26,10,15,.58); font-size:11px; font-weight:800; }
+.miniapp-availability-days button.active { border-color:var(--mini-ink); background:var(--mini-ink); color:var(--mini-bg); }
+.miniapp-availability-times { display:grid; gap:9px; }
+.miniapp-availability-times > div { display:grid; grid-template-columns:minmax(80px,1fr) auto auto; align-items:center; gap:7px; }
+.miniapp-availability-times strong { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.miniapp-availability-times label { display:flex; align-items:center; gap:4px; color:rgba(26,10,15,.48); font-size:10px; font-weight:750; }
+.miniapp-availability-times input { width:78px; min-height:38px; border:1px solid rgba(26,10,15,.13); border-radius:10px; background:var(--mini-surface); padding:7px 5px; color:var(--mini-ink); font-size:12px; font-weight:700; }
+.miniapp-availability-error { color:#922f2f !important; font-weight:700; }
 .miniapp-alert { border-radius:14px; background:#e9f7ef; color:#225d3c; padding:12px 14px; font-size:13px; font-weight:650; }
 .miniapp-alert.is-notice { display:flex; width:calc(100% - 2.5rem); align-items:center; justify-content:space-between; gap:12px; animation:miniapp-notice-in .22s ease-out; }
 .miniapp-alert.is-notice b { flex:0 0 auto; font-size:20px; font-weight:500; line-height:1; opacity:.5; }

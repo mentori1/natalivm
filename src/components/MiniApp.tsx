@@ -8,7 +8,12 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
+import {
+  INDIVIDUAL_WEEKDAYS,
+  type IndividualAvailabilitySlot,
+} from "@/lib/individual-availability";
 
 type Tab = "home" | "schedule" | "subscriptions" | "trainer" | "profile" | "payments" | "admin";
 type LessonType = "online" | "offline";
@@ -43,6 +48,8 @@ type PortalData = {
     status: string;
     frozen: boolean;
     scheduledLessons: number;
+    availability: IndividualAvailabilitySlot[];
+    availabilityUpdatedAt: string | null;
   }>;
   hasSubscriptionHistory: boolean;
   bookingCredits: Array<{
@@ -248,7 +255,9 @@ export function MiniApp() {
   const [lessonCounts, setLessonCounts] = useState<Record<number, number>>({});
   const [uploadingPayment, setUploadingPayment] = useState("");
   const [adminFilter, setAdminFilter] = useState<"review" | "confirmed" | "rejected">("review");
-  const [individualDates, setIndividualDates] = useState<Record<number, string>>({});
+  const [individualAvailability, setIndividualAvailability] = useState<
+    Record<number, IndividualAvailabilitySlot[]>
+  >({});
   const [editDates, setEditDates] = useState<Record<number, string>>({});
   const [editingLesson, setEditingLesson] = useState<number | null>(null);
   const [transferTargets, setTransferTargets] = useState<Record<number, number>>({});
@@ -428,14 +437,13 @@ export function MiniApp() {
       setLessonCounts(
         Object.fromEntries(result.prices.map((price) => [price.id, price.minLessons])),
       );
-      setIndividualDates((old) => ({
-        ...Object.fromEntries(
+      setIndividualAvailability(
+        Object.fromEntries(
           result.subscriptions
             .filter((subscription) => subscription.format === "individual")
-            .map((subscription) => [subscription.id, dateTimeInput()]),
+            .map((subscription) => [subscription.id, subscription.availability]),
         ),
-        ...old,
-      }));
+      );
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Не удалось открыть кабинет");
     } finally {
@@ -579,6 +587,32 @@ export function MiniApp() {
     }, 80);
   }
 
+  function toggleAvailabilityDay(subscriptionId: number, weekday: number) {
+    setIndividualAvailability((current) => {
+      const slots = current[subscriptionId] || [];
+      const exists = slots.some((slot) => slot.weekday === weekday);
+      const next = exists
+        ? slots.filter((slot) => slot.weekday !== weekday)
+        : [...slots, { weekday, from: "18:00", to: "21:00" }]
+            .sort((a, b) => a.weekday - b.weekday);
+      return { ...current, [subscriptionId]: next };
+    });
+  }
+
+  function updateAvailabilityTime(
+    subscriptionId: number,
+    weekday: number,
+    key: "from" | "to",
+    value: string,
+  ) {
+    setIndividualAvailability((current) => ({
+      ...current,
+      [subscriptionId]: (current[subscriptionId] || []).map((slot) =>
+        slot.weekday === weekday ? { ...slot, [key]: value } : slot,
+      ),
+    }));
+  }
+
   const filteredLessons = useMemo(
     () => data?.lessons.filter((lesson) => lesson.type === type) || [],
     [data, type],
@@ -598,13 +632,6 @@ export function MiniApp() {
     ...(data?.bookings.map((booking) => booking.lessonId) || []),
     ...(data?.scheduledLessons.map((lesson) => lesson.lessonId) || []),
   ]);
-  const individualSubscriptions = data?.subscriptions.filter(
-    (subscription) =>
-      subscription.format === "individual" &&
-      ["active", "ending"].includes(subscription.status) &&
-      !subscription.frozen &&
-      subscription.remaining > 0,
-  ) || [];
   const payablePayments = data?.payments.filter((payment) =>
     ["awaiting_receipt", "rejected"].includes(payment.status),
   ) || [];
@@ -1133,56 +1160,6 @@ export function MiniApp() {
               </div>
             )}
 
-            {individualSubscriptions.length > 0 && (
-              <div className="mt-7">
-                <p className="miniapp-kicker">Индивидуально</p>
-                <h3 className="text-xl font-bold">Поставить занятия</h3>
-                <div className="mt-3 space-y-3">
-                  {individualSubscriptions.map((subscription) => {
-                    const available = Math.max(0, subscription.remaining - subscription.scheduledLessons);
-                    return (
-                      <article key={subscription.id} className="miniapp-individual-plan">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className="miniapp-type">
-                              {subscription.type === "online" ? "Онлайн" : "Офлайн"}
-                            </span>
-                            <h4 className="mt-2 font-bold">{subscription.name}</h4>
-                          </div>
-                          <span className="text-sm font-semibold opacity-65">
-                            можно поставить {available}
-                          </span>
-                        </div>
-                        {available > 0 && (
-                          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
-                            <input
-                              type="datetime-local"
-                              value={individualDates[subscription.id] || dateTimeInput()}
-                              onChange={(event) => setIndividualDates((old) => ({
-                                ...old,
-                                [subscription.id]: event.target.value,
-                              }))}
-                            />
-                            <button
-                              disabled={busy}
-                              className="miniapp-small-button"
-                              onClick={() => void action({
-                                action: "scheduleIndividual",
-                                subscriptionId: subscription.id,
-                                startsAt: individualDates[subscription.id] || dateTimeInput(),
-                              })}
-                            >
-                              Добавить
-                            </button>
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {(data.showGroupSchedule || selectedBookingPrice) && (
               <>
                 <div id="miniapp-group-lessons" className="mt-8 scroll-mt-4">
@@ -1249,7 +1226,25 @@ export function MiniApp() {
             {data.subscriptions.length > 0 && (
               <div className="mt-4 space-y-3">
                 {data.subscriptions.map((subscription) => (
-                  <SubscriptionCard key={subscription.id} subscription={subscription} />
+                  <SubscriptionCard key={subscription.id} subscription={subscription}>
+                    {subscription.format === "individual" && (
+                      <IndividualAvailabilityEditor
+                        slots={individualAvailability[subscription.id] || []}
+                        busy={busy}
+                        onToggleDay={(weekday) =>
+                          toggleAvailabilityDay(subscription.id, weekday)
+                        }
+                        onTimeChange={(weekday, key, value) =>
+                          updateAvailabilityTime(subscription.id, weekday, key, value)
+                        }
+                        onSave={() => void action({
+                          action: "saveIndividualAvailability",
+                          subscriptionId: subscription.id,
+                          availability: individualAvailability[subscription.id] || [],
+                        })}
+                      />
+                    )}
+                  </SubscriptionCard>
                 ))}
               </div>
             )}
@@ -1715,7 +1710,13 @@ export function MiniApp() {
   );
 }
 
-function SubscriptionCard({ subscription }: { subscription: PortalData["subscriptions"][number] }) {
+function SubscriptionCard({
+  subscription,
+  children,
+}: {
+  subscription: PortalData["subscriptions"][number];
+  children?: ReactNode;
+}) {
   const progress = subscription.unlimited
     ? 100
     : subscription.totalLessons
@@ -1738,6 +1739,104 @@ function SubscriptionCard({ subscription }: { subscription: PortalData["subscrip
         <span>{STATUS[subscription.status] || subscription.status}</span>
         <span>{subscription.unlimited ? "без срока" : `до ${formatDate(subscription.expiresAt)}`}</span>
       </div>
+      {children}
     </article>
+  );
+}
+
+function IndividualAvailabilityEditor({
+  slots,
+  busy,
+  onToggleDay,
+  onTimeChange,
+  onSave,
+}: {
+  slots: IndividualAvailabilitySlot[];
+  busy: boolean;
+  onToggleDay(weekday: number): void;
+  onTimeChange(weekday: number, key: "from" | "to", value: string): void;
+  onSave(): void;
+}) {
+  const invalid = slots.some((slot) => !slot.from || !slot.to || slot.from >= slot.to);
+  return (
+    <details className="miniapp-availability">
+      <summary>
+        <span>
+          <b>Удобные дни и время</b>
+          <small>
+            {slots.length
+              ? `${slots.length} ${slots.length === 1 ? "день выбран" : slots.length < 5 ? "дня выбрано" : "дней выбрано"}`
+              : "Укажите пожелания преподавателю"}
+          </small>
+        </span>
+        <i aria-hidden="true">⌄</i>
+      </summary>
+      <div className="miniapp-availability-body">
+        <p>
+          Выберите подходящие дни и интервалы. Наталья сверит свободные окна и поставит конкретные занятия.
+        </p>
+        <div className="miniapp-availability-days" aria-label="Удобные дни недели">
+          {INDIVIDUAL_WEEKDAYS.map((day) => {
+            const selected = slots.some((slot) => slot.weekday === day.value);
+            return (
+              <button
+                key={day.value}
+                type="button"
+                className={selected ? "active" : ""}
+                aria-pressed={selected}
+                onClick={() => onToggleDay(day.value)}
+              >
+                {day.short}
+              </button>
+            );
+          })}
+        </div>
+        {slots.length > 0 && (
+          <div className="miniapp-availability-times">
+            {slots.map((slot) => {
+              const day = INDIVIDUAL_WEEKDAYS.find((item) => item.value === slot.weekday);
+              return (
+                <div key={slot.weekday}>
+                  <strong>{day?.label}</strong>
+                  <label>
+                    <span>с</span>
+                    <input
+                      type="time"
+                      value={slot.from}
+                      onChange={(event) =>
+                        onTimeChange(slot.weekday, "from", event.target.value)
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>до</span>
+                    <input
+                      type="time"
+                      value={slot.to}
+                      onChange={(event) =>
+                        onTimeChange(slot.weekday, "to", event.target.value)
+                      }
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {invalid && (
+          <p className="miniapp-availability-error">
+            Время окончания должно быть позже времени начала.
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={busy || invalid}
+          className="miniapp-small-button w-full"
+          onClick={onSave}
+        >
+          {slots.length ? "Сохранить пожелания" : "Очистить пожелания"}
+        </button>
+      </div>
+    </details>
   );
 }
