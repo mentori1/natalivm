@@ -100,6 +100,27 @@ export async function GET(req: NextRequest) {
         subscriptions: { orderBy: { purchasedAt: "desc" } },
       },
     });
+    const subscriptionsWithStatus = fullClient.subscriptions.map((item) => ({
+      item,
+      status: derivedSubStatus(item, now),
+    }));
+    const visibleSubscriptions = subscriptionsWithStatus.filter(
+      ({ status }) => status !== "finished_lessons" && status !== "finished_term",
+    );
+    const hasSubscriptionHistory = fullClient.subscriptions.length > 0;
+    const usableSubscriptionFormats = new Set(
+      subscriptionsWithStatus
+        .filter(
+          ({ item, status }) =>
+            (status === "active" || status === "ending") &&
+            !item.frozen &&
+            remaining(item) > 0,
+        )
+        .map(({ item }) => item.format),
+    );
+    const hasOnlyIndividualSubscription =
+      usableSubscriptionFormats.size === 1 &&
+      usableSubscriptionFormats.has("individual");
     const lessons = await prisma.lesson.findMany({
       where: { startsAt: { gte: now }, format: "group" },
       include: {
@@ -193,6 +214,11 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+    const hasGroupBookingCredit = bookingPayments.some(
+      (item) => item.status === "credit" && item.holdExpiresAt > now,
+    );
+    const showGroupSchedule =
+      !hasOnlyIndividualSubscription || hasGroupBookingCredit;
     const subscriptionPayments = await prisma.subscriptionOrder.findMany({
       where: {
         clientId: client.id,
@@ -346,10 +372,9 @@ export async function GET(req: NextRequest) {
     const trainerOrderStatus = trainerPayments.find((item) =>
       ["awaiting_receipt", "review", "rejected"].includes(item.status)
     )?.status || null;
-    const finishedSubscriptions = fullClient.subscriptions.filter((item) => {
-      const status = derivedSubStatus(item, now);
-      return status === "finished_lessons" || status === "finished_term";
-    }).length;
+    const finishedSubscriptions = subscriptionsWithStatus.filter(
+      ({ status }) => status === "finished_lessons" || status === "finished_term",
+    ).length;
     const shouldOfferTrainer =
       !fullClient.hasTrainer &&
       fullClient.status !== "barter" &&
@@ -488,6 +513,7 @@ export async function GET(req: NextRequest) {
       (booking) => booking.kind === "trial" && booking.lesson.type === "online",
     );
     const trialCrossSell =
+      !hasSubscriptionHistory &&
       attendedTrialTypes.has("offline") &&
       !usedTrialTypes.has("online") &&
       !hasUpcomingOnlineTrial &&
@@ -507,7 +533,7 @@ export async function GET(req: NextRequest) {
         fullName: fullClient.fullName,
         telegram: fullClient.telegram,
       },
-      subscriptions: fullClient.subscriptions.map((item) => ({
+      subscriptions: visibleSubscriptions.map(({ item, status }) => ({
         id: item.id,
         type: item.type,
         format: item.format,
@@ -517,12 +543,13 @@ export async function GET(req: NextRequest) {
         usedLessons: item.usedLessons,
         remaining: remaining(item),
         expiresAt: item.expiresAt.toISOString(),
-        status: derivedSubStatus(item),
+        status,
         frozen: item.frozen,
         scheduledLessons: scheduledAttendances.filter(
           (attendance) => attendance.plannedSubscriptionId === item.id,
         ).length,
       })),
+      hasSubscriptionHistory,
       bookingCredits: bookingPayments
         .filter((item) => item.status === "credit" && item.holdExpiresAt > now)
         .map((item) => ({
@@ -556,7 +583,11 @@ export async function GET(req: NextRequest) {
         title: item.lesson.title || "Занятие",
       })),
       prices: prices
-        .filter((item) => item.kind !== "trial" || !usedTrialTypes.has(item.type))
+        .filter(
+          (item) =>
+            item.kind !== "trial" ||
+            (!hasSubscriptionHistory && !usedTrialTypes.has(item.type)),
+        )
         .map((item) => ({
           id: item.id,
           name: item.name,
@@ -568,6 +599,7 @@ export async function GET(req: NextRequest) {
           requiresLesson: item.kind !== "subscription" && item.format === "group",
         })),
       trialCrossSell,
+      showGroupSchedule,
       lessonHistory,
       trainerUpsell,
       paymentReady: Boolean(settings.paymentDetails),

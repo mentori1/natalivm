@@ -44,6 +44,7 @@ type PortalData = {
     frozen: boolean;
     scheduledLessons: number;
   }>;
+  hasSubscriptionHistory: boolean;
   bookingCredits: Array<{
     id: number;
     title: string;
@@ -88,6 +89,7 @@ type PortalData = {
     requiresLesson: boolean;
   }>;
   trialCrossSell: { priceItemId: number; price: number } | null;
+  showGroupSchedule: boolean;
   trainerUpsell: { title: string; text: string } | null;
   lessonHistory: Array<{
     id: string;
@@ -804,7 +806,11 @@ export function MiniApp() {
                   ))}
                 </div>
               ) : (
-                <div className="miniapp-empty">Абонемента пока нет. Начните с пробного занятия.</div>
+                <div className="miniapp-empty">
+                  {data.hasSubscriptionHistory
+                    ? "Действующего абонемента сейчас нет. Выберите новый тариф."
+                    : "Абонемента пока нет. Начните с пробного занятия."}
+                </div>
               )}
             </section>
 
@@ -1106,58 +1112,62 @@ export function MiniApp() {
               </div>
             )}
 
-            <div id="miniapp-group-lessons" className="mt-8 scroll-mt-4">
-              <p className="miniapp-kicker">Групповые занятия</p>
-              <h3 className="text-xl font-bold">Выберите занятие</h3>
-            </div>
-            {selectedBookingPrice && (
-              <div className="miniapp-payment-callout mt-4">
-                <span>
-                  <small>Выбран тариф</small>
-                  <strong>{selectedBookingPrice.name} · {money(selectedBookingPrice.price)}</strong>
-                </span>
-                <button onClick={() => setSelectedBookingPriceId(null)}>Сбросить</button>
-              </div>
+            {(data.showGroupSchedule || selectedBookingPrice) && (
+              <>
+                <div id="miniapp-group-lessons" className="mt-8 scroll-mt-4">
+                  <p className="miniapp-kicker">Групповые занятия</p>
+                  <h3 className="text-xl font-bold">Выберите занятие</h3>
+                </div>
+                {selectedBookingPrice && (
+                  <div className="miniapp-payment-callout mt-4">
+                    <span>
+                      <small>Выбран тариф</small>
+                      <strong>{selectedBookingPrice.name} · {money(selectedBookingPrice.price)}</strong>
+                    </span>
+                    <button onClick={() => setSelectedBookingPriceId(null)}>Сбросить</button>
+                  </div>
+                )}
+                <div className="miniapp-segment mt-4">
+                  <button className={type === "online" ? "active" : ""} onClick={() => { setType("online"); setSelectedBookingPriceId(null); }}>Онлайн</button>
+                  <button className={type === "offline" ? "active" : ""} onClick={() => { setType("offline"); setSelectedBookingPriceId(null); }}>Офлайн</button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {filteredLessons.length ? filteredLessons.map((lesson) => {
+                    const booked = bookedLessonIds.has(lesson.id);
+                    return (
+                      <article key={lesson.id} className="miniapp-row">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold">{formatScheduleDate(lesson.startsAt)}</p>
+                          <p className="mt-1 truncate text-sm opacity-60">{lesson.title}</p>
+                          {lesson.free !== null && lesson.free <= 3 && (
+                            <p className="mt-1 text-xs font-semibold text-[var(--mini-accent)]">
+                              Осталось {lesson.free} {lesson.free === 1 ? "место" : "места"}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          disabled={busy || booked}
+                          className="miniapp-small-button"
+                          onClick={() => void (async () => {
+                            const result = await action(
+                              {
+                                action: "book",
+                                lessonId: lesson.id,
+                                priceItemId: selectedBookingPriceId || undefined,
+                              },
+                              { openPaymentsWhenRequired: true },
+                            );
+                            if (result) setSelectedBookingPriceId(null);
+                          })()}
+                        >
+                          {booked ? "Записаны" : "Выбрать"}
+                        </button>
+                      </article>
+                    );
+                  }) : <div className="miniapp-empty">Ближайших занятий этого формата пока нет.</div>}
+                </div>
+              </>
             )}
-            <div className="miniapp-segment mt-4">
-              <button className={type === "online" ? "active" : ""} onClick={() => { setType("online"); setSelectedBookingPriceId(null); }}>Онлайн</button>
-              <button className={type === "offline" ? "active" : ""} onClick={() => { setType("offline"); setSelectedBookingPriceId(null); }}>Офлайн</button>
-            </div>
-            <div className="mt-4 space-y-3">
-              {filteredLessons.length ? filteredLessons.map((lesson) => {
-                const booked = bookedLessonIds.has(lesson.id);
-                return (
-                  <article key={lesson.id} className="miniapp-row">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold">{formatScheduleDate(lesson.startsAt)}</p>
-                      <p className="mt-1 truncate text-sm opacity-60">{lesson.title}</p>
-                      {lesson.free !== null && lesson.free <= 3 && (
-                        <p className="mt-1 text-xs font-semibold text-[var(--mini-accent)]">
-                          Осталось {lesson.free} {lesson.free === 1 ? "место" : "места"}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      disabled={busy || booked}
-                      className="miniapp-small-button"
-                      onClick={() => void (async () => {
-                        const result = await action(
-                          {
-                            action: "book",
-                            lessonId: lesson.id,
-                            priceItemId: selectedBookingPriceId || undefined,
-                          },
-                          { openPaymentsWhenRequired: true },
-                        );
-                        if (result) setSelectedBookingPriceId(null);
-                      })()}
-                    >
-                      {booked ? "Записаны" : "Выбрать"}
-                    </button>
-                  </article>
-                );
-              }) : <div className="miniapp-empty">Ближайших занятий этого формата пока нет.</div>}
-            </div>
           </section>
         )}
 
