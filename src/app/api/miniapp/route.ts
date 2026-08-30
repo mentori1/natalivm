@@ -108,6 +108,9 @@ export async function GET(req: NextRequest) {
       ({ status }) => status !== "finished_lessons" && status !== "finished_term",
     );
     const hasSubscriptionHistory = fullClient.subscriptions.length > 0;
+    const subscriptionTypes = new Set(
+      fullClient.subscriptions.map((item) => item.type),
+    );
     const usableSubscriptionFormats = new Set(
       subscriptionsWithStatus
         .filter(
@@ -513,7 +516,7 @@ export async function GET(req: NextRequest) {
       (booking) => booking.kind === "trial" && booking.lesson.type === "online",
     );
     const trialCrossSell =
-      !hasSubscriptionHistory &&
+      !subscriptionTypes.has("online") &&
       attendedTrialTypes.has("offline") &&
       !usedTrialTypes.has("online") &&
       !hasUpcomingOnlineTrial &&
@@ -586,7 +589,7 @@ export async function GET(req: NextRequest) {
         .filter(
           (item) =>
             item.kind !== "trial" ||
-            (!hasSubscriptionHistory && !usedTrialTypes.has(item.type)),
+            (!subscriptionTypes.has(item.type) && !usedTrialTypes.has(item.type)),
         )
         .map((item) => ({
           id: item.id,
