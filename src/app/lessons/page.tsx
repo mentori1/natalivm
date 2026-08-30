@@ -74,8 +74,7 @@ export default async function LessonsPage({
   const upcoming = filteredLessons.filter((l) => l.startsAt >= now);
   const past = filteredLessons
     .filter((l) => l.startsAt < now)
-    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
-    .slice(0, 20);
+    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   const selectedDate =
     parseDate(params.d) ??
     upcoming.find((l) => sameMonth(l.startsAt, selectedMonth))?.startsAt ??
@@ -188,14 +187,22 @@ export default async function LessonsPage({
           )}
 
           {past.length > 0 && (
-            <section>
-              <SectionTitle>Прошедшие</SectionTitle>
-              <div className="space-y-3">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-4 shadow-sm transition-colors hover:bg-brand-tint [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-ink">Прошедшие занятия</p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {past.length} {declLesson(past.length)}
+                  </p>
+                </div>
+                <IconChevronRight className="size-5 shrink-0 text-muted/60 transition-transform group-open:rotate-90" />
+              </summary>
+              <div className="mt-3 space-y-3">
                 {past.map((l) => (
                   <LessonRow key={l.id} lesson={l} past />
                 ))}
               </div>
-            </section>
+            </details>
           )}
         </>
       )}
@@ -400,6 +407,15 @@ type Lesson = {
   capacity: number | null;
   attendances: { status: string }[];
 };
+
+function declLesson(n: number): string {
+  const lastTwo = n % 100;
+  const last = n % 10;
+  if (lastTwo >= 11 && lastTwo <= 14) return "занятий";
+  if (last === 1) return "занятие";
+  if (last >= 2 && last <= 4) return "занятия";
+  return "занятий";
+}
 
 function lessonsHref({
   type,

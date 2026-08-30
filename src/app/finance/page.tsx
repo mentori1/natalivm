@@ -14,7 +14,7 @@ import {
 import { Card, SectionTitle } from "@/components/ui";
 import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
-import { IconX, IconSparkle } from "@/components/icons";
+import { IconChevronRight, IconX, IconSparkle } from "@/components/icons";
 import { ConfirmActionForm } from "@/components/ConfirmActionForm";
 
 export const dynamic = "force-dynamic";
@@ -122,6 +122,8 @@ export default async function FinancePage({
       date: booking.reviewedAt ?? booking.createdAt,
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
+  const visibleIncome = income.slice(0, 7);
+  const hiddenIncome = income.slice(7);
 
   const revenue = income.reduce((s, i) => s + i.amount, 0);
   const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
@@ -177,21 +179,25 @@ export default async function FinancePage({
           </Card>
         ) : (
           <Card className="divide-y divide-line overflow-hidden p-0">
-            {income.map((i) => (
-              <Link
-                key={i.key}
-                href={i.clientId ? `/clients/${i.clientId}` : "/bot"}
-                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-brand-tint"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ink">{i.name}</p>
-                  <p className="text-xs text-muted">{i.desc}</p>
-                </div>
-                <span className="shrink-0 font-semibold text-green-600">
-                  +{formatMoney(i.amount)}
-                </span>
-              </Link>
+            {visibleIncome.map((item) => (
+              <IncomeRow key={item.key} item={item} />
             ))}
+            {hiddenIncome.length > 0 && (
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand-tint [&::-webkit-details-marker]:hidden">
+                  <span className="group-open:hidden">
+                    Посмотреть все · {income.length}
+                  </span>
+                  <span className="hidden group-open:inline">Свернуть</span>
+                  <IconChevronRight className="size-4 transition-transform group-open:rotate-90" />
+                </summary>
+                <div className="divide-y divide-line border-t border-line">
+                  {hiddenIncome.map((item) => (
+                    <IncomeRow key={item.key} item={item} />
+                  ))}
+                </div>
+              </details>
+            )}
           </Card>
         )}
       </section>
@@ -328,5 +334,31 @@ function Big({
         {value}
       </p>
     </Card>
+  );
+}
+
+function IncomeRow({
+  item,
+}: {
+  item: {
+    clientId: number | null;
+    name: string;
+    desc: string;
+    amount: number;
+  };
+}) {
+  return (
+    <Link
+      href={item.clientId ? `/clients/${item.clientId}` : "/bot"}
+      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-brand-tint"
+    >
+      <div className="min-w-0">
+        <p className="truncate font-medium text-ink">{item.name}</p>
+        <p className="text-xs text-muted">{item.desc}</p>
+      </div>
+      <span className="shrink-0 font-semibold text-green-600">
+        +{formatMoney(item.amount)}
+      </span>
+    </Link>
   );
 }
