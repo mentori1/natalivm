@@ -88,6 +88,7 @@ type PortalData = {
     requiresLesson: boolean;
   }>;
   trialCrossSell: { priceItemId: number; price: number } | null;
+  trainerUpsell: { title: string; text: string } | null;
   lessonHistory: Array<{
     id: string;
     startsAt: string;
@@ -744,6 +745,22 @@ export function MiniApp() {
                   </strong>
                 </span>
                 <b>Открыть</b>
+              </button>
+            )}
+
+            {data.trainerUpsell && (
+              <button
+                type="button"
+                className="miniapp-trainer-upsell"
+                onClick={() => setTab("trainer")}
+              >
+                <span className="miniapp-trainer-upsell-copy">
+                  <small>Домашняя практика</small>
+                  <strong>{data.trainerUpsell.title}</strong>
+                  <p>{data.trainerUpsell.text}</p>
+                  <b>Посмотреть тренажёр</b>
+                </span>
+                <span className="miniapp-trainer-upsell-photo" aria-hidden="true" />
               </button>
             )}
 

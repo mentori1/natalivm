@@ -103,6 +103,14 @@
 .miniapp-payment-callout small { color:var(--mini-accent); font-size:10px; font-weight:850; letter-spacing:.07em; text-transform:uppercase; }
 .miniapp-payment-callout strong { font-size:14px; }
 .miniapp-payment-callout b { flex:0 0 auto; color:var(--mini-accent); font-size:12px; }
+.miniapp-trainer-upsell { display:grid; width:100%; min-height:178px; grid-template-columns:minmax(0,1fr) 112px; overflow:hidden; border:1px solid rgba(255,255,255,.72); border-radius:20px; background:rgba(255,249,251,.72); color:var(--mini-ink); text-align:left; box-shadow:0 14px 32px rgba(80,35,50,.11),inset 0 1px 0 rgba(255,255,255,.92); backdrop-filter:blur(18px) saturate(1.35); -webkit-backdrop-filter:blur(18px) saturate(1.35); transition:transform .16s ease,box-shadow .16s ease; }
+.miniapp-trainer-upsell:active { transform:scale(.985); box-shadow:0 9px 22px rgba(80,35,50,.09); }
+.miniapp-trainer-upsell-copy { display:flex; min-width:0; flex-direction:column; align-items:flex-start; padding:17px 12px 16px 17px; }
+.miniapp-trainer-upsell-copy small { color:var(--mini-accent); font-size:10px; font-weight:850; letter-spacing:.07em; text-transform:uppercase; }
+.miniapp-trainer-upsell-copy strong { margin-top:7px; font-size:17px; line-height:1.18; }
+.miniapp-trainer-upsell-copy p { margin-top:7px; color:rgba(26,10,15,.64); font-size:12px; line-height:1.45; }
+.miniapp-trainer-upsell-copy b { margin-top:auto; padding-top:10px; color:var(--mini-accent); font-size:12px; }
+.miniapp-trainer-upsell-photo { min-height:100%; background-color:#ead2c2; background-image:url('/miniapp-trainer-product-fast.jpg'); background-position:center; background-size:cover; }
 .miniapp-payment-details { border:1px solid rgba(255,255,255,.54); border-radius:20px; background:rgba(255,249,251,.68); padding:18px; box-shadow:0 13px 30px rgba(26,10,15,.1); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
 .miniapp-copy-button { flex:0 0 auto; border:1px solid rgba(26,10,15,.13); border-radius:11px; background:rgba(246,230,234,.72); padding:8px 10px; font-size:11px; font-weight:800; }
 .miniapp-payment-card { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); padding:17px; }

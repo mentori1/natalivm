@@ -343,6 +343,32 @@ export async function GET(req: NextRequest) {
           title: item.subscription.tariffName || "Занятие по абонементу",
         })),
     ].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+    const trainerOrderStatus = trainerPayments.find((item) =>
+      ["awaiting_receipt", "review", "rejected"].includes(item.status)
+    )?.status || null;
+    const finishedSubscriptions = fullClient.subscriptions.filter((item) => {
+      const status = derivedSubStatus(item, now);
+      return status === "finished_lessons" || status === "finished_term";
+    }).length;
+    const shouldOfferTrainer =
+      !fullClient.hasTrainer &&
+      fullClient.status !== "barter" &&
+      !trainerOrderStatus &&
+      (
+        finishedSubscriptions > 0 ||
+        fullClient.subscriptions.length >= 2 ||
+        lessonHistory.length >= 8
+      );
+    const trainerUpsell = shouldOfferTrainer
+      ? {
+          title: "Добавьте домашнюю практику",
+          text: fullClient.subscriptions.length >= 2
+            ? "Вы уже занимаетесь не первый абонемент. Тренажёр «Волна» поможет закреплять технику дома между занятиями."
+            : finishedSubscriptions > 0
+              ? "Первый абонемент уже пройден. Тренажёр «Волна» поможет продолжать практику дома и усилить результат."
+              : `У вас уже ${lessonHistory.length} занятий. Тренажёр «Волна» поможет глубже чувствовать работу мышц между тренировками.`,
+        }
+      : null;
 
     const isAdmin = telegramAdminIds().has(String(user.id));
     const adminBookingPayments = isAdmin
@@ -543,6 +569,7 @@ export async function GET(req: NextRequest) {
         })),
       trialCrossSell,
       lessonHistory,
+      trainerUpsell,
       paymentReady: Boolean(settings.paymentDetails),
       paymentDetails: settings.paymentDetails || "",
       payments,
@@ -554,9 +581,7 @@ export async function GET(req: NextRequest) {
         imageUrl: "/miniapp-trainer-product-fast.jpg",
         hasTrainer: fullClient.hasTrainer,
         price: TRAINER_PRICE_DEFAULT,
-        orderStatus: trainerPayments.find((item) =>
-          ["awaiting_receipt", "review", "rejected"].includes(item.status)
-        )?.status || null,
+        orderStatus: trainerOrderStatus,
       },
       generatedAt: new Date().toISOString(),
     });
