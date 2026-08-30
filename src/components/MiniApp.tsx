@@ -14,7 +14,7 @@ type Tab = "home" | "schedule" | "subscriptions" | "trainer" | "profile" | "paym
 type LessonType = "online" | "offline";
 type MiniNavTab = Exclude<Tab, "payments" | "admin">;
 type Payment = {
-  kind: "booking" | "subscription" | "trainer";
+  kind: "booking" | "subscription" | "trainer" | "visit" | "legacy_subscription";
   id: number;
   title: string;
   detail: string;
@@ -88,7 +88,14 @@ type PortalData = {
     requiresLesson: boolean;
   }>;
   trialCrossSell: { priceItemId: number; price: number } | null;
-  preferences: { preferredType: string; preferredWeekdays: number[] };
+  lessonHistory: Array<{
+    id: string;
+    startsAt: string;
+    hasTime: boolean;
+    type: LessonType;
+    format: "group" | "individual";
+    title: string;
+  }>;
   paymentReady: boolean;
   paymentDetails: string;
   payments: Payment[];
@@ -121,16 +128,6 @@ declare global {
     };
   }
 }
-
-const WEEKDAYS = [
-  { id: 1, short: "Пн" },
-  { id: 2, short: "Вт" },
-  { id: 3, short: "Ср" },
-  { id: 4, short: "Чт" },
-  { id: 5, short: "Пт" },
-  { id: 6, short: "Сб" },
-  { id: 7, short: "Вс" },
-];
 
 const MINIAPP_NAV: Array<[MiniNavTab, string, string]> = [
   ["subscriptions", "Абонемент", "◇"],
@@ -241,8 +238,6 @@ export function MiniApp() {
   const [type, setType] = useState<LessonType>("online");
   const [priceType, setPriceType] = useState<LessonType>("online");
   const [priceFormat, setPriceFormat] = useState<"group" | "individual">("group");
-  const [weekdays, setWeekdays] = useState<number[]>([]);
-  const [preferredType, setPreferredType] = useState("both");
   const [lessonCounts, setLessonCounts] = useState<Record<number, number>>({});
   const [uploadingPayment, setUploadingPayment] = useState("");
   const [adminFilter, setAdminFilter] = useState<"review" | "confirmed" | "rejected">("review");
@@ -413,8 +408,6 @@ export function MiniApp() {
       if (!response.ok) throw new Error(result.error || "Не удалось открыть кабинет");
       setData(result);
       if (result.isAdmin) setTab("admin");
-      setWeekdays(result.preferences.preferredWeekdays);
-      setPreferredType(result.preferences.preferredType);
       setLessonCounts(
         Object.fromEntries(result.prices.map((price) => [price.id, price.minLessons])),
       );
@@ -581,6 +574,9 @@ export function MiniApp() {
   const payablePayments = data?.payments.filter((payment) =>
     ["awaiting_receipt", "rejected"].includes(payment.status),
   ) || [];
+  const paidTotal = data?.payments
+    .filter((payment) => ["confirmed", "credit"].includes(payment.status))
+    .reduce((sum, payment) => sum + payment.amount, 0) || 0;
   const filteredAdminPayments = data?.adminPayments.filter(
     (payment) => payment.status === adminFilter,
   ) || [];
@@ -1330,7 +1326,9 @@ export function MiniApp() {
                 <p className="miniapp-kicker">Архив</p>
                 <h3 className="text-xl font-bold">История платежей</h3>
               </div>
-              <span className="text-xs opacity-55">{data.payments.length}</span>
+              <span className="text-xs font-semibold opacity-60">
+                {money(paidTotal)} · {data.payments.length}
+              </span>
             </div>
             <div className="mt-3 space-y-3">
               {data.payments.length ? data.payments.map((payment) => (
@@ -1457,46 +1455,46 @@ export function MiniApp() {
         {tab === "profile" && (
           <section>
             <p className="miniapp-kicker">Личный кабинет</p>
-            <h2 className="miniapp-title">Удобные дни</h2>
-            <p className="mt-2 text-sm opacity-65">
-              Отметьте формат и дни, когда вам обычно удобно заниматься.
-            </p>
-            <div className="miniapp-segment mt-5">
-              {[["both", "Любой"], ["online", "Онлайн"], ["offline", "Офлайн"]].map(([value, label]) => (
-                <button key={value} className={preferredType === value ? "active" : ""} onClick={() => setPreferredType(value)}>{label}</button>
-              ))}
-            </div>
-            <div className="mt-5 grid grid-cols-7 gap-1.5">
-              {WEEKDAYS.map((day) => (
-                <button
-                  key={day.id}
-                  className={`miniapp-day ${weekdays.includes(day.id) ? "active" : ""}`}
-                  onClick={() => setWeekdays((old) => old.includes(day.id) ? old.filter((id) => id !== day.id) : [...old, day.id])}
-                >
-                  {day.short}
-                </button>
-              ))}
-            </div>
-            <button
-              disabled={busy}
-              className="miniapp-primary mt-6 w-full"
-              onClick={() => void action({ action: "preferences", preferredType, preferredWeekdays: weekdays })}
-            >
-              Сохранить
-            </button>
-            <button
-              className="miniapp-profile-link mt-3 w-full"
-              onClick={() => setTab("payments")}
-            >
-              <span>История платежей</span>
-              <strong>{data.payments.length}</strong>
-            </button>
-            <div className="miniapp-profile mt-6">
+            <h2 className="miniapp-title">Профиль</h2>
+            <div className="miniapp-profile mt-5">
               <div>
                 <p className="text-xs opacity-55">Карточка CRM</p>
                 <p className="mt-1 font-bold">{data.client.fullName}</p>
               </div>
               <span className="text-sm opacity-60">{data.client.telegram}</span>
+            </div>
+            <button
+              className="miniapp-profile-link mt-3 w-full"
+              onClick={() => setTab("payments")}
+            >
+              <span>История платежей</span>
+              <strong>{money(paidTotal)}</strong>
+            </button>
+
+            <div className="mt-8 flex items-end justify-between gap-3">
+              <div>
+                <p className="miniapp-kicker">Посещения</p>
+                <h3 className="text-xl font-bold">История занятий</h3>
+              </div>
+              <span className="text-xs opacity-55">{data.lessonHistory.length}</span>
+            </div>
+            <div className="mt-3 space-y-3">
+              {data.lessonHistory.length ? data.lessonHistory.map((lesson) => (
+                <article key={lesson.id} className="miniapp-history-card">
+                  <div className="min-w-0">
+                    <h4 className="font-bold">{lesson.title}</h4>
+                    <p className="mt-1 text-sm opacity-60">
+                      {formatDate(lesson.startsAt, lesson.hasTime)}
+                    </p>
+                  </div>
+                  <div className="miniapp-history-tags">
+                    <span>{lesson.type === "online" ? "Онлайн" : "Офлайн"}</span>
+                    <span>{lesson.format === "individual" ? "Индивидуально" : "Группа"}</span>
+                  </div>
+                </article>
+              )) : (
+                <div className="miniapp-empty">Подтверждённых посещений пока нет.</div>
+              )}
             </div>
           </section>
         )}

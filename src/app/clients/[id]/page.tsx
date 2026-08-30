@@ -88,6 +88,16 @@ export default async function ClientCardPage({
     ? (client.trainerProfit ?? TRAINER_PROFIT_DEFAULT)
     : 0;
   const botSpent = client.botBookings.reduce((sum, booking) => sum + booking.amount, 0);
+  const paidVisitKeys = new Set(
+    client.singleVisits.map((visit) =>
+      `${visit.date.toISOString().slice(0, 10)}:${visit.type}`
+    ),
+  );
+  const unmatchedAttendances = client.attendances.filter((attendance) =>
+    !paidVisitKeys.has(
+      `${attendance.lesson.startsAt.toISOString().slice(0, 10)}:${attendance.lesson.type}`,
+    )
+  );
 
   return (
     <div className="space-y-7">
@@ -182,7 +192,7 @@ export default async function ClientCardPage({
         <Stat
           label="Посещений всего"
           value={String(
-            visits + client.singleVisits.length + client.attendances.length,
+            visits + client.singleVisits.length + unmatchedAttendances.length,
           )}
         />
         <Stat
@@ -348,11 +358,11 @@ export default async function ClientCardPage({
       </section>
 
       {/* Фактические занятия, которые не списались с абонемента */}
-      {client.attendances.length > 0 && (
+      {unmatchedAttendances.length > 0 && (
         <section>
           <SectionTitle>Посещения без абонемента</SectionTitle>
           <Card className="divide-y divide-line overflow-hidden p-0">
-            {client.attendances.map((attendance) => (
+            {unmatchedAttendances.map((attendance) => (
               <div
                 key={attendance.id}
                 className="flex items-center gap-3 px-4 py-3"

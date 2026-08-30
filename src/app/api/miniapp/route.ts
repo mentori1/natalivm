@@ -40,7 +40,7 @@ import {
 export const dynamic = "force-dynamic";
 
 type PortalPayment = {
-  kind: "booking" | "subscription" | "trainer";
+  kind: "booking" | "subscription" | "trainer" | "visit" | "legacy_subscription";
   id: number;
   title: string;
   detail: string;
@@ -53,6 +53,19 @@ type PortalPayment = {
   receiptMimeType: string | null;
   clientName?: string;
 };
+
+type PortalLessonHistory = {
+  id: string;
+  startsAt: string;
+  hasTime: boolean;
+  type: string;
+  format: string;
+  title: string;
+};
+
+function dayKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
 
 function identity(req: NextRequest) {
   return validateTelegramMiniAppData(
@@ -85,7 +98,6 @@ export async function GET(req: NextRequest) {
       where: { id: client.id },
       include: {
         subscriptions: { orderBy: { purchasedAt: "desc" } },
-        portalPreference: true,
       },
     });
     const lessons = await prisma.lesson.findMany({
@@ -135,9 +147,22 @@ export async function GET(req: NextRequest) {
         { id: "asc" },
       ],
     });
-    const trialVisits = await prisma.singleVisit.findMany({
-      where: { clientId: client.id, kind: "trial" },
-      select: { type: true },
+    const singleVisits = await prisma.singleVisit.findMany({
+      where: { clientId: client.id },
+      orderBy: { date: "desc" },
+      take: 200,
+    });
+    const attendanceHistory = await prisma.attendance.findMany({
+      where: { clientId: client.id, status: "present" },
+      include: { lesson: true, subscription: true },
+      orderBy: { lesson: { startsAt: "desc" } },
+      take: 200,
+    });
+    const subscriptionVisitHistory = await prisma.subscriptionVisit.findMany({
+      where: { subscription: { clientId: client.id } },
+      include: { subscription: true },
+      orderBy: { date: "desc" },
+      take: 200,
     });
     const confirmedTrialBookings = await prisma.botBooking.findMany({
       where: {
@@ -184,6 +209,15 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+    const hasMatchingSubscriptionOrder = (subscription: typeof fullClient.subscriptions[number]) =>
+      subscriptionPayments.some((order) => {
+        if (order.status !== "confirmed") return false;
+        const reviewedAt = order.reviewedAt || order.updatedAt;
+        return order.type === subscription.type &&
+          order.format === subscription.format &&
+          order.totalLessons === subscription.totalLessons &&
+          Math.abs(reviewedAt.getTime() - subscription.purchasedAt.getTime()) < 5 * 60 * 1000;
+      });
     const payments: PortalPayment[] = [
       ...bookingPayments.map((item) => ({
         kind: "booking" as const,
@@ -226,7 +260,89 @@ export async function GET(req: NextRequest) {
         receiptName: item.receiptFileName,
         receiptMimeType: item.receiptMimeType,
       })),
+      ...singleVisits
+        .filter((item) => item.amount > 0)
+        .map((item) => ({
+          kind: "visit" as const,
+          id: item.id,
+          title: item.tariffName ||
+            (item.kind === "trial" ? "Пробное занятие" : "Разовое занятие"),
+          detail: `${item.kind === "trial" ? "Пробное" : "Разовое"} · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+          amount: Math.round(item.amount),
+          status: "confirmed",
+          createdAt: item.date.toISOString(),
+          updatedAt: item.createdAt.toISOString(),
+          hasReceipt: false,
+          receiptName: null,
+          receiptMimeType: null,
+        })),
+      ...fullClient.subscriptions
+        .filter((item) =>
+          item.pricePerLesson > 0 &&
+          item.totalLessons > 0 &&
+          !hasMatchingSubscriptionOrder(item)
+        )
+        .map((item) => ({
+          kind: "legacy_subscription" as const,
+          id: item.id,
+          title: item.tariffName || "Абонемент",
+          detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+          amount: Math.round(item.pricePerLesson * item.totalLessons),
+          status: "confirmed",
+          createdAt: item.purchasedAt.toISOString(),
+          updatedAt: item.createdAt.toISOString(),
+          hasReceipt: false,
+          receiptName: null,
+          receiptMimeType: null,
+        })),
     ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const attendanceKeys = new Set(
+      attendanceHistory.map((item) => `${dayKey(item.lesson.startsAt)}:${item.lesson.type}`),
+    );
+    const lessonHistory: PortalLessonHistory[] = [
+      ...attendanceHistory.map((item) => {
+        const matchingVisit = singleVisits.find(
+          (visit) =>
+            visit.type === item.lesson.type &&
+            dayKey(visit.date) === dayKey(item.lesson.startsAt),
+        );
+        return {
+          id: `attendance:${item.id}`,
+          startsAt: item.lesson.startsAt.toISOString(),
+          hasTime: true,
+          type: item.lesson.type,
+          format: item.lesson.format,
+          title: matchingVisit?.tariffName ||
+            item.subscription?.tariffName ||
+            item.lesson.title ||
+            "Занятие",
+        };
+      }),
+      ...singleVisits
+        .filter((item) => !attendanceKeys.has(`${dayKey(item.date)}:${item.type}`))
+        .map((item) => ({
+          id: `visit:${item.id}`,
+          startsAt: item.date.toISOString(),
+          hasTime: false,
+          type: item.type,
+          format: "group",
+          title: item.tariffName ||
+            (item.kind === "trial" ? "Пробное занятие" : "Разовое занятие"),
+        })),
+      ...subscriptionVisitHistory
+        .filter((item) => !attendanceKeys.has(
+          `${dayKey(item.date)}:${item.subscription.type}`,
+        ))
+        .map((item) => ({
+          id: `subscription-visit:${item.id}`,
+          startsAt: item.date.toISOString(),
+          hasTime: false,
+          type: item.subscription.type,
+          format: item.subscription.format,
+          title: item.subscription.tariffName || "Занятие по абонементу",
+        })),
+    ].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 
     const isAdmin = telegramAdminIds().has(String(user.id));
     const adminBookingPayments = isAdmin
@@ -327,11 +443,11 @@ export async function GET(req: NextRequest) {
       })
       .filter((lesson) => lesson.available);
     const usedTrialTypes = new Set([
-      ...trialVisits.map((visit) => visit.type),
+      ...singleVisits.filter((visit) => visit.kind === "trial").map((visit) => visit.type),
       ...confirmedTrialBookings.map((booking) => booking.lesson.type),
     ]);
     const attendedTrialTypes = new Set([
-      ...trialVisits.map((visit) => visit.type),
+      ...singleVisits.filter((visit) => visit.kind === "trial").map((visit) => visit.type),
       ...confirmedTrialBookings
         .filter((booking) => booking.lesson.attendances.length > 0)
         .map((booking) => booking.lesson.type),
@@ -426,12 +542,7 @@ export async function GET(req: NextRequest) {
           requiresLesson: item.kind !== "subscription" && item.format === "group",
         })),
       trialCrossSell,
-      preferences: {
-        preferredType: fullClient.portalPreference?.preferredType || "both",
-        preferredWeekdays: fullClient.portalPreference?.preferredWeekdays
-          ? JSON.parse(fullClient.portalPreference.preferredWeekdays)
-          : [],
-      },
+      lessonHistory,
       paymentReady: Boolean(settings.paymentDetails),
       paymentDetails: settings.paymentDetails || "",
       payments,
@@ -460,8 +571,6 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       action?: string;
       lessonId?: number;
-      preferredType?: string;
-      preferredWeekdays?: number[];
       priceItemId?: number;
       totalLessons?: number;
       paymentKind?: "booking" | "subscription" | "trainer";
@@ -726,30 +835,6 @@ export async function POST(req: NextRequest) {
             ? "Место сохранено. Оплатите и прикрепите чек."
             : "Вы записаны на занятие",
       });
-    }
-
-    if (body.action === "preferences") {
-      const preferredType = ["online", "offline", "both"].includes(
-        body.preferredType || "",
-      )
-        ? body.preferredType
-        : "both";
-      const preferredWeekdays = [...new Set(body.preferredWeekdays || [])]
-        .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7)
-        .sort();
-      await prisma.clientPortalPreference.upsert({
-        where: { clientId: client.id },
-        create: {
-          clientId: client.id,
-          preferredType,
-          preferredWeekdays: JSON.stringify(preferredWeekdays),
-        },
-        update: {
-          preferredType,
-          preferredWeekdays: JSON.stringify(preferredWeekdays),
-        },
-      });
-      return NextResponse.json({ ok: true, message: "Удобные дни сохранены" });
     }
 
     if (body.action === "buyTrainer") {

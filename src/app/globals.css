@@ -52,6 +52,9 @@
 .miniapp-reschedule-box label { display:block; margin-bottom:7px; color:rgba(26,10,15,.58); font-size:11px; font-weight:800; text-transform:uppercase; }
 .miniapp-reschedule-box input, .miniapp-reschedule-box select, .miniapp-individual-plan input { width:100%; min-height:44px; border:1px solid rgba(26,10,15,.14); border-radius:11px; background:var(--mini-surface); padding:9px 11px; color:var(--mini-ink); font-size:13px; font-weight:650; }
 .miniapp-profile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px; }
+.miniapp-history-card { display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); padding:16px; }
+.miniapp-history-tags { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+.miniapp-history-tags span { border-radius:999px; background:rgba(143,41,71,.09); padding:5px 8px; color:var(--mini-brand); font-size:10px; font-weight:800; text-transform:uppercase; }
 .miniapp-trainer-photo { aspect-ratio:4/3; overflow:hidden; border:1px solid rgba(26,10,15,.11); border-radius:20px; background:var(--mini-surface); }
 .miniapp-trainer-photo img { width:100%; height:100%; object-fit:cover; }
 .miniapp-trainer-copy { border:1px solid rgba(26,10,15,.11); border-radius:18px; background:var(--mini-surface); padding:18px; color:rgba(26,10,15,.72); font-size:14px; line-height:1.65; }
@@ -113,7 +116,7 @@
 .miniapp-upload input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 .miniapp-receipt-button, .miniapp-profile-link { border:1px solid rgba(26,10,15,.12); border-radius:12px; background:rgba(246,230,234,.66); padding:10px 12px; color:var(--mini-ink); font-size:12px; font-weight:800; }
 .miniapp-profile-link { display:flex; min-height:48px; align-items:center; justify-content:space-between; }
-.miniapp-profile-link strong { display:grid; min-width:25px; height:25px; place-items:center; border-radius:999px; background:var(--mini-ink); color:var(--mini-bg); font-size:11px; }
+.miniapp-profile-link strong { display:grid; min-width:25px; height:25px; place-items:center; border-radius:999px; background:var(--mini-ink); padding:0 8px; color:var(--mini-bg); font-size:11px; }
 .miniapp-overdue { display:inline-flex; border-radius:999px; background:#f4d7c8; padding:4px 7px; color:#8b3c24; font-size:10px; font-weight:850; text-transform:uppercase; }
 .miniapp-decline-button, .miniapp-approve-button { min-height:45px; border-radius:13px; font-size:13px; font-weight:850; }
 .miniapp-decline-button { border:1px solid rgba(146,47,47,.24); background:#fff0f0; color:#922f2f; }
