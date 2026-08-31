@@ -119,7 +119,7 @@ export default async function BotPage() {
         </section>
 
         <section>
-          <SectionTitle>Подписка на канал</SectionTitle>
+          <SectionTitle>Канал</SectionTitle>
           <Card className="grid gap-4 p-5 sm:grid-cols-2">
             <Field
               label="Канал для проверки"
@@ -140,8 +140,9 @@ export default async function BotPage() {
               />
             </Field>
             <p className="text-sm text-muted sm:col-span-2">
-              Для надёжной проверки подписки добавьте бота администратором канала.
-              Если оба поля пустые, проверка пропускается.
+              Подписка не ограничивает доступ к боту и кабинету. Канал рекомендуется
+              клиенту после подтверждения оплаты, а бот сообщает администратору о
+              подписках и отписках.
             </p>
           </Card>
         </section>

@@ -62,7 +62,7 @@ export async function handleRequiredChannelMemberUpdate(
 
   const name = telegramDisplayName(user) || "Имя не указано";
   const username = user.username ? `@${user.username}` : "не указан";
-  await setClientCabinetMenu(String(user.id), isMember).catch(() => undefined);
+  await setClientCabinetMenu(String(user.id), true).catch(() => undefined);
   await notifyAdmins(
     [
       isMember

@@ -10,7 +10,6 @@ import {
 } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
 import { syncTelegramClient } from "@/lib/telegram-client-sync";
-import { requiredSubscriptionAccess } from "@/lib/telegram-subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -45,27 +44,9 @@ async function resolveClient(auth: ReturnType<typeof identity>) {
   return { ...auth, client };
 }
 
-async function requireMiniAppAccess(req: NextRequest) {
-  const auth = identity(req);
-  const access = await requiredSubscriptionAccess(String(auth.user.id));
-  return { auth, access };
-}
-
-function subscriptionRequiredResponse(subscribeUrl: string | null) {
-  return NextResponse.json(
-    {
-      error: "Подпишитесь на канал @VUMEXCLUSIVE, чтобы открыть личный кабинет",
-      code: "subscription_required",
-      subscribeUrl,
-    },
-    { status: 403 },
-  );
-}
-
 export async function GET(req: NextRequest) {
   try {
-    const { auth, access } = await requireMiniAppAccess(req);
-    if (!access.subscribed) return subscriptionRequiredResponse(access.subscribeUrl);
+    const auth = identity(req);
     const { user, client } = await resolveClient(auth);
     const kind = paymentKind(req.nextUrl.searchParams.get("kind"));
     const id = paymentId(req.nextUrl.searchParams.get("id"));
@@ -123,8 +104,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { auth, access } = await requireMiniAppAccess(req);
-    if (!access.subscribed) return subscriptionRequiredResponse(access.subscribeUrl);
+    const auth = identity(req);
     const { user, client } = await resolveClient(auth);
     const form = await req.formData();
     const kind = paymentKind(form.get("kind"));

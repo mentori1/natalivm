@@ -241,9 +241,6 @@ function telegramInitData() {
 
 export function MiniApp() {
   const [data, setData] = useState<PortalData | null>(null);
-  const [subscriptionGate, setSubscriptionGate] = useState<{
-    subscribeUrl: string | null;
-  } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -425,13 +422,7 @@ export function MiniApp() {
         code?: string;
         subscribeUrl?: string | null;
       };
-      if (response.status === 403 && result.code === "subscription_required") {
-        setData(null);
-        setSubscriptionGate({ subscribeUrl: result.subscribeUrl ?? null });
-        return;
-      }
       if (!response.ok) throw new Error(result.error || "Не удалось открыть кабинет");
-      setSubscriptionGate(null);
       setData(result);
       if (result.isAdmin) setTab("admin");
       setLessonCounts(
@@ -489,11 +480,6 @@ export function MiniApp() {
         code?: string;
         subscribeUrl?: string | null;
       };
-      if (response.status === 403 && result.code === "subscription_required") {
-        setData(null);
-        setSubscriptionGate({ subscribeUrl: result.subscribeUrl ?? null });
-        return null;
-      }
       if (!response.ok) throw new Error(result.error || "Не удалось выполнить действие");
       setNotice(result.message || "Готово");
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light");
@@ -531,11 +517,6 @@ export function MiniApp() {
         code?: string;
         subscribeUrl?: string | null;
       };
-      if (response.status === 403 && result.code === "subscription_required") {
-        setData(null);
-        setSubscriptionGate({ subscribeUrl: result.subscribeUrl ?? null });
-        return;
-      }
       if (!response.ok) throw new Error(result.error || "Не удалось отправить чек");
       setNotice(result.message || "Чек отправлен на проверку");
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light");
@@ -652,46 +633,6 @@ export function MiniApp() {
     return (
       <main className="miniapp-shell grid min-h-[100dvh] place-items-center px-6">
         <div className="miniapp-loader" aria-label="Загрузка" />
-      </main>
-    );
-  }
-
-  if (subscriptionGate) {
-    return (
-      <main className="miniapp-shell grid min-h-[100dvh] place-items-center px-5 text-center">
-        <div className="miniapp-subscription-gate">
-          <p className="miniapp-kicker">Доступ к кабинету</p>
-          <h1>Сначала подпишитесь на канал</h1>
-          <p>
-            Личный кабинет VUMEXCLUSIVE откроется после подтверждения подписки.
-          </p>
-          <div className="mt-6 grid gap-3">
-            {subscriptionGate.subscribeUrl && (
-              <button
-                type="button"
-                className="miniapp-primary w-full"
-                onClick={() => {
-                  const url = subscriptionGate.subscribeUrl;
-                  if (!url) return;
-                  if (window.Telegram?.WebApp?.openTelegramLink) {
-                    window.Telegram.WebApp.openTelegramLink(url);
-                  } else {
-                    window.location.href = url;
-                  }
-                }}
-              >
-                Подписаться на канал
-              </button>
-            )}
-            <button
-              type="button"
-              className="miniapp-glass-pill w-full"
-              onClick={() => void load()}
-            >
-              Проверить подписку
-            </button>
-          </div>
-        </div>
       </main>
     );
   }
@@ -840,7 +781,7 @@ export function MiniApp() {
                   <small>Оплата</small>
                   <strong>
                     {payablePayments.length
-                      ? "Нужно прикрепить чек"
+                      ? "Отправьте чек в бот"
                       : "Чек находится на проверке"}
                   </strong>
                 </span>
@@ -1364,6 +1305,30 @@ export function MiniApp() {
             )}
 
             {payablePayments.length > 0 && (
+              <div className="miniapp-payment-details mt-4">
+                <p className="font-bold">Отправьте чек прямо в бот</p>
+                <p className="mt-2 text-sm opacity-65">
+                  В приложении банка нажмите «Поделиться чеком», выберите Telegram и этот бот.
+                  PDF или изображение автоматически прикрепится к последней оплате.
+                </p>
+                <button
+                  type="button"
+                  className="miniapp-glass-pill mt-4 w-full"
+                  onClick={() => {
+                    const url = "https://t.me/Nata0024bot";
+                    if (window.Telegram?.WebApp?.openTelegramLink) {
+                      window.Telegram.WebApp.openTelegramLink(url);
+                    } else {
+                      window.location.href = url;
+                    }
+                  }}
+                >
+                  Открыть чат с ботом
+                </button>
+              </div>
+            )}
+
+            {payablePayments.length > 0 && (
               <div className="mt-5 space-y-3">
                 {payablePayments.map((payment) => {
                   const key = `${payment.kind}:${payment.id}`;
@@ -1379,8 +1344,11 @@ export function MiniApp() {
                         </div>
                         <strong className="shrink-0">{money(payment.amount)}</strong>
                       </div>
+                      <p className="mt-3 text-xs opacity-55">
+                        Чек из диалога с ботом прикрепится сюда автоматически.
+                      </p>
                       <label className="miniapp-upload mt-4">
-                        {uploadingPayment === key ? "Отправляю..." : payment.status === "rejected" ? "Загрузить новый чек" : "Прикрепить чек"}
+                        {uploadingPayment === key ? "Отправляю..." : payment.status === "rejected" ? "Или загрузить новый чек здесь" : "Или прикрепить чек здесь"}
                         <input
                           type="file"
                           accept="image/*,application/pdf"

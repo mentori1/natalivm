@@ -18,6 +18,7 @@ import {
   rejectSubscriptionPayment,
   rejectTrainerPayment,
 } from "@/lib/payment-review";
+import { withChannelRecommendation } from "@/lib/payment-copy";
 import {
   bindClientWithPortalToken,
   findClientByTelegram,
@@ -35,9 +36,7 @@ import {
 } from "@/lib/telegram-api";
 import {
   hasRequiredSubscription,
-  requiredSubscriptionAccess,
   setClientCabinetMenu,
-  subscriptionChannelUrl,
 } from "@/lib/telegram-subscription";
 
 const MINUTE = 60 * 1000;
@@ -264,27 +263,12 @@ async function sendWelcome(chatId: string, userId?: string) {
     );
     return;
   }
-  const copy = await getBotCopy();
   const miniAppUrl = process.env.MINIAPP_URL?.trim();
-  const subscribed = !userId ||
-    (await requiredSubscriptionAccess(userId, settings)).subscribed;
   if (userId) {
-    await setClientCabinetMenu(chatId, subscribed).catch(() => undefined);
+    await setClientCabinetMenu(chatId, true).catch(() => undefined);
   }
   const rows: { text: string; url?: string; callback_data?: string; web_app?: { url: string } }[][] = [];
-  if (!subscribed) {
-    const url = subscriptionChannelUrl(
-      settings.requiredChannelChatId,
-      settings.requiredChannelUrl,
-    );
-    if (url) rows.push([{ text: copy.text("buttonSubscribe"), url }]);
-    rows.push([
-      {
-        text: copy.text("buttonCheckSubscription"),
-        callback_data: "client:check",
-      },
-    ]);
-  } else if (miniAppUrl) {
+  if (miniAppUrl) {
     rows.push([{ text: "Личный кабинет", web_app: { url: miniAppUrl } }]);
   }
   const text = settings.welcomeText || "Добро пожаловать в VUMEXCLUSIVE.";
@@ -297,32 +281,9 @@ async function sendWelcome(chatId: string, userId?: string) {
   ).catch(() => replaceScreen(chatId, text, welcomeMarkup));
 }
 
-async function askForSubscription(chatId: string) {
-  const settings = await getBotSettings();
-  const copy = await getBotCopy();
-  const url = subscriptionChannelUrl(
-    settings.requiredChannelChatId,
-    settings.requiredChannelUrl,
-  );
-  const rows: { text: string; url?: string; callback_data?: string }[][] = [];
-  if (url) rows.push([{ text: copy.text("buttonSubscribe"), url }]);
-  rows.push([
-    {
-      text: copy.text("buttonCheckSubscription"),
-      callback_data: "client:check",
-    },
-  ]);
-  await replaceScreen(
-    chatId,
-    copy.text("subscriptionPrompt"),
-    { inline_keyboard: rows },
-  );
-}
-
 export async function requireSubscription(chatId: string, userId: string) {
-  if (await hasRequiredSubscription(userId)) return true;
-  await askForSubscription(chatId);
-  return false;
+  await setClientCabinetMenu(chatId, true).catch(() => undefined);
+  return Boolean(userId);
 }
 
 async function expireOldHolds(notify = false) {
@@ -909,24 +870,27 @@ export async function createBooking(
   }
 }
 
+type ReceiptFile = {
+  id: string;
+  name: string;
+  mime: string;
+  method: "sendDocument" | "sendPhoto";
+  field: "document" | "photo";
+};
+
 async function acceptSubscriptionReceipt(
   message: TelegramMessage,
-  file: {
-    id: string;
-    name: string;
-    mime: string;
-    method: string;
-    field: string;
-  },
+  file: ReceiptFile,
+  orderId: number,
 ) {
   if (!message.from) return false;
   const order = await prisma.subscriptionOrder.findFirst({
     where: {
+      id: orderId,
       telegramChatId: String(message.chat.id),
       telegramUserId: String(message.from.id),
       status: { in: ["awaiting_receipt", "rejected"] },
     },
-    orderBy: { createdAt: "desc" },
   });
   if (!order) return false;
   const copy = await getBotCopy();
@@ -968,48 +932,142 @@ async function acceptSubscriptionReceipt(
   return true;
 }
 
+async function acceptTrainerReceipt(
+  message: TelegramMessage,
+  file: ReceiptFile,
+  orderId: number,
+) {
+  if (!message.from) return false;
+  const order = await prisma.trainerOrder.findFirst({
+    where: {
+      id: orderId,
+      telegramChatId: String(message.chat.id),
+      telegramUserId: String(message.from.id),
+      status: { in: ["awaiting_receipt", "rejected"] },
+    },
+  });
+  if (!order) return false;
+  const copy = await getBotCopy();
+  await prisma.trainerOrder.update({
+    where: { id: order.id },
+    data: {
+      status: "review",
+      receiptFileId: file.id,
+      receiptFileName: file.name,
+      receiptMimeType: file.mime,
+    },
+  });
+  await replaceScreen(
+    order.telegramChatId,
+    "Чек получен и отправлен на проверку. После подтверждения тренажёр появится в личном кабинете.",
+  );
+  const caption =
+    `Проверка покупки тренажёра №${order.id}\n\n` +
+    `Тренажёр «Волна» · ${order.amount.toLocaleString("ru-RU")} ₽`;
+  for (const adminId of telegramAdminIds()) {
+    await telegramApi<TelegramMessage>(file.method, {
+      chat_id: adminId,
+      [file.field]: file.id,
+      caption,
+      reply_markup: {
+        inline_keyboard: [[
+          {
+            text: copy.text("buttonApprove"),
+            callback_data: `admin:approve-trainer:${order.id}`,
+          },
+          {
+            text: copy.text("buttonReject"),
+            callback_data: `admin:reject-trainer:${order.id}`,
+          },
+        ]],
+      },
+    }).catch(() => undefined);
+  }
+  return true;
+}
+
 async function acceptReceipt(message: TelegramMessage) {
   if (!message.from) return false;
   const copy = await getBotCopy();
+  const documentName = message.document?.file_name ?? "Чек";
+  const documentMime = message.document?.mime_type?.toLowerCase() ?? "";
+  const isReceiptDocument = Boolean(
+    message.document &&
+      (documentMime === "application/pdf" ||
+        documentMime.startsWith("image/") ||
+        /\.(pdf|png|jpe?g|webp|heic)$/i.test(documentName)),
+  );
   const file =
-    message.document?.mime_type === "application/pdf"
+    message.document && isReceiptDocument
       ? {
           id: message.document.file_id,
-          name: message.document.file_name ?? "Чек.pdf",
-          mime: message.document.mime_type,
-          method: "sendDocument",
-          field: "document",
+          name: documentName,
+          mime: documentMime || "application/octet-stream",
+          method: "sendDocument" as const,
+          field: "document" as const,
         }
       : message.photo?.length
         ? {
             id: message.photo[message.photo.length - 1].file_id,
             name: "Фото чека",
             mime: "image/jpeg",
-            method: "sendPhoto",
-            field: "photo",
+            method: "sendPhoto" as const,
+            field: "photo" as const,
           }
         : null;
   if (!file) return false;
 
   const now = new Date();
-  const booking = await prisma.botBooking.findFirst({
-    where: {
-      telegramChatId: String(message.chat.id),
-      telegramUserId: String(message.from.id),
-      status: { in: ["awaiting_receipt", "rejected"] },
-      holdExpiresAt: { gt: now },
+  const paymentOwner = {
+    telegramChatId: String(message.chat.id),
+    telegramUserId: String(message.from.id),
+    status: { in: ["awaiting_receipt", "rejected"] },
+  };
+  const [booking, subscriptionOrder, trainerOrder] = await Promise.all([
+    prisma.botBooking.findFirst({
+      where: { ...paymentOwner, holdExpiresAt: { gt: now } },
+      include: { lesson: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.subscriptionOrder.findFirst({
+      where: paymentOwner,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.trainerOrder.findFirst({
+      where: paymentOwner,
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  const latestPayment = [
+    booking && { kind: "booking" as const, id: booking.id, createdAt: booking.createdAt },
+    subscriptionOrder && {
+      kind: "subscription" as const,
+      id: subscriptionOrder.id,
+      createdAt: subscriptionOrder.createdAt,
     },
-    include: { lesson: true },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!booking) {
-    if (await acceptSubscriptionReceipt(message, file)) return true;
+    trainerOrder && {
+      kind: "trainer" as const,
+      id: trainerOrder.id,
+      createdAt: trainerOrder.createdAt,
+    },
+  ]
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
+
+  if (!latestPayment) {
     await replaceScreen(
       String(message.chat.id),
       copy.text("receiptWithoutBooking"),
     );
     return true;
   }
+  if (latestPayment.kind === "subscription") {
+    return acceptSubscriptionReceipt(message, file, latestPayment.id);
+  }
+  if (latestPayment.kind === "trainer") {
+    return acceptTrainerReceipt(message, file, latestPayment.id);
+  }
+  if (!booking || booking.id !== latestPayment.id) return false;
 
   const reviewUntil = new Date(
     Math.min(
@@ -1105,13 +1163,15 @@ async function approveBooking(query: TelegramCallbackQuery, bookingId: number) {
   await answerCallback(query.id, "Оплата подтверждена");
   await replaceScreen(
     result.booking.telegramChatId,
-    copy
-      .text("paymentConfirmed", {
-        date: formatDateTime(result.booking.lesson.startsAt),
-        format:
-          result.booking.lesson.type === "online" ? "онлайн" : "офлайн",
-      })
-      .replace("3 часа", "2 часа"),
+    withChannelRecommendation(
+      copy
+        .text("paymentConfirmed", {
+          date: formatDateTime(result.booking.lesson.startsAt),
+          format:
+            result.booking.lesson.type === "online" ? "онлайн" : "офлайн",
+        })
+        .replace("3 часа", "2 часа"),
+    ),
   );
 }
 
@@ -1163,7 +1223,9 @@ async function approveSubscriptionOrder(
   }).format(result.expiresAt);
   await replaceScreen(
     result.order.telegramChatId,
-    `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+    withChannelRecommendation(
+      `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+    ),
   );
 }
 
@@ -1209,7 +1271,9 @@ async function approveTrainerOrder(
   await answerCallback(query.id, "Покупка подтверждена");
   await replaceScreen(
     result.order.telegramChatId,
-    "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+    withChannelRecommendation(
+      "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+    ),
   );
 }
 
@@ -1326,14 +1390,11 @@ export async function handleClientBotCallback(query: TelegramCallbackQuery) {
     const subscribed = await hasRequiredSubscription(userId);
     await answerCallback(
       query.id,
-      subscribed ? "Подписка подтверждена" : "Подписка пока не найдена",
-      !subscribed,
+      subscribed
+        ? "Подписка подтверждена"
+        : "Подписка пока не найдена. Кабинет всё равно доступен.",
     );
-    if (subscribed) {
-      await sendWelcome(chatId, userId);
-    } else {
-      await askForSubscription(chatId);
-    }
+    await sendWelcome(chatId, userId);
     return;
   }
   if (data === "client:schedule") {

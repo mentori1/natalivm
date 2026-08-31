@@ -17,6 +17,7 @@ import {
   rejectSubscriptionPayment,
   rejectTrainerPayment,
 } from "@/lib/payment-review";
+import { withChannelRecommendation } from "@/lib/payment-copy";
 import { ensureDefaultPriceItems } from "@/lib/prices";
 import {
   createBooking,
@@ -24,7 +25,6 @@ import {
 } from "@/lib/telegram-client-bot";
 import { sendTelegramMessage, telegramAdminIds } from "@/lib/telegram-api";
 import { validateTelegramMiniAppData } from "@/lib/telegram-miniapp-auth";
-import { requiredSubscriptionAccess } from "@/lib/telegram-subscription";
 import {
   formatIndividualAvailability,
   normalizeIndividualAvailability,
@@ -84,14 +84,6 @@ async function resolveClient(auth: ReturnType<typeof identity>) {
   return { ...auth, client };
 }
 
-function subscriptionRequiredPayload(subscribeUrl: string | null) {
-  return {
-    error: "Подпишитесь на канал @VUMEXCLUSIVE, чтобы открыть личный кабинет",
-    code: "subscription_required",
-    subscribeUrl,
-  };
-}
-
 function errorResponse(error: unknown, status = 400) {
   return NextResponse.json(
     { error: error instanceof Error ? error.message : "Не удалось выполнить действие" },
@@ -102,13 +94,6 @@ function errorResponse(error: unknown, status = 400) {
 export async function GET(req: NextRequest) {
   try {
     const auth = identity(req);
-    const access = await requiredSubscriptionAccess(String(auth.user.id));
-    if (!access.subscribed) {
-      return NextResponse.json(
-        subscriptionRequiredPayload(access.subscribeUrl),
-        { status: 403 },
-      );
-    }
     const { user, client } = await resolveClient(auth);
     const now = currentMoscowWallClockDate();
     await ensureDefaultPriceItems();
@@ -649,13 +634,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const auth = identity(req);
-    const access = await requiredSubscriptionAccess(String(auth.user.id));
-    if (!access.subscribed) {
-      return NextResponse.json(
-        subscriptionRequiredPayload(access.subscribeUrl),
-        { status: 403 },
-      );
-    }
     const { user, client } = await resolveClient(auth);
     const body = (await req.json()) as {
       action?: string;
@@ -845,7 +823,9 @@ export async function POST(req: NextRequest) {
         }
         await sendTelegramMessage(
           result.booking.telegramChatId,
-          `Оплата подтверждена. Вы записаны: ${formatDateTime(result.booking.lesson.startsAt)}, ${result.booking.lesson.type === "online" ? "онлайн" : "офлайн"}.`,
+          withChannelRecommendation(
+            `Оплата подтверждена. Вы записаны: ${formatDateTime(result.booking.lesson.startsAt)}, ${result.booking.lesson.type === "online" ? "онлайн" : "офлайн"}.`,
+          ),
         ).catch(() => undefined);
         return NextResponse.json({ ok: true, message: "Оплата подтверждена" });
       }
@@ -875,7 +855,9 @@ export async function POST(req: NextRequest) {
         }).format(result.expiresAt);
         await sendTelegramMessage(
           result.order.telegramChatId,
-          `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+          withChannelRecommendation(
+            `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+          ),
         ).catch(() => undefined);
         return NextResponse.json({ ok: true, message: "Абонемент активирован" });
       }
@@ -895,7 +877,9 @@ export async function POST(req: NextRequest) {
         if (!result.ok) throw new Error("Платёж уже обработан");
         await sendTelegramMessage(
           result.order.telegramChatId,
-          "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+          withChannelRecommendation(
+            "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+          ),
         ).catch(() => undefined);
         return NextResponse.json({ ok: true, message: "Покупка тренажёра подтверждена" });
       }

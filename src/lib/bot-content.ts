@@ -289,7 +289,7 @@ export const BOT_CONTENT_DEFINITIONS = [
     group: "payment",
     label: "Инструкция по оплате",
     defaultValue:
-      "Вы выбрали: {{date}}, {{format}}.\n\nТариф: {{tariff}}\nК оплате: {{amount}} ₽\n\nРеквизиты:\n{{paymentDetails}}\n\nМесто удерживается {{holdMinutes}} минут. После оплаты отправьте сюда чек в PDF или фотографией.",
+      "Вы выбрали: {{date}}, {{format}}.\n\nТариф: {{tariff}}\nК оплате: {{amount}} ₽\n\nРеквизиты:\n{{paymentDetails}}\n\nМесто удерживается {{holdMinutes}} минут. После оплаты нажмите в банке «Поделиться чеком» и отправьте его в этот диалог. Можно прислать PDF или изображение.",
     hint:
       "{{date}}, {{format}}, {{tariff}}, {{amount}}, {{paymentDetails}}, {{holdMinutes}}",
   },
@@ -298,7 +298,7 @@ export const BOT_CONTENT_DEFINITIONS = [
     group: "payment",
     label: "Чек без активной брони",
     defaultValue:
-      "Активной брони не найдено. Сначала выберите занятие в меню.",
+      "Активной оплаты не найдено. Сначала выберите занятие, абонемент или тренажёр в личном кабинете.",
   },
   {
     key: "receiptReceived",

@@ -245,7 +245,7 @@ export default async function FinancePage({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
-                      href={`/clients/${payment.clientId}`}
+                      href={payment.clientId ? `/clients/${payment.clientId}` : "/bot"}
                       className="font-semibold text-ink hover:text-brand-dark"
                     >
                       {payment.name}

@@ -11,6 +11,7 @@ import {
   rejectSubscriptionPayment,
   rejectTrainerPayment,
 } from "@/lib/payment-review";
+import { withChannelRecommendation } from "@/lib/payment-copy";
 import { sendTelegramMessage } from "@/lib/telegram-api";
 
 type PaymentKind = "booking" | "subscription" | "trainer";
@@ -47,7 +48,9 @@ export async function reviewPaymentInCrm(fd: FormData) {
     if (!result.ok) throw new Error("Платёж уже обработан или мест больше недоступно");
     await sendTelegramMessage(
       result.booking.telegramChatId,
-      `Оплата подтверждена. Вы записаны: ${formatDateTime(result.booking.lesson.startsAt)}, ${result.booking.lesson.type === "online" ? "онлайн" : "офлайн"}.`,
+      withChannelRecommendation(
+        `Оплата подтверждена. Вы записаны: ${formatDateTime(result.booking.lesson.startsAt)}, ${result.booking.lesson.type === "online" ? "онлайн" : "офлайн"}.`,
+      ),
     ).catch(() => undefined);
     revalidatePath(`/lessons/${result.booking.lessonId}`);
     if (result.booking.clientId) revalidatePath(`/clients/${result.booking.clientId}`);
@@ -69,7 +72,9 @@ export async function reviewPaymentInCrm(fd: FormData) {
     }).format(result.expiresAt);
     await sendTelegramMessage(
       result.order.telegramChatId,
-      `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+      withChannelRecommendation(
+        `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+      ),
     ).catch(() => undefined);
     revalidatePath(`/clients/${result.order.clientId}`);
   } else if (kind === "subscription" && decision === "reject") {
@@ -84,7 +89,9 @@ export async function reviewPaymentInCrm(fd: FormData) {
     if (!result.ok) throw new Error("Платёж уже обработан");
     await sendTelegramMessage(
       result.order.telegramChatId,
-      "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+      withChannelRecommendation(
+        "Оплата подтверждена. Тренажёр «Волна» отмечен в вашем личном кабинете.",
+      ),
     ).catch(() => undefined);
     revalidatePath(`/clients/${result.order.clientId}`);
   } else {
