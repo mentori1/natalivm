@@ -84,7 +84,7 @@ export async function syncTelegramClient(
     where: { id: client.id },
     data: {
       telegramUserId,
-      telegram: telegram ?? client.telegram,
+      telegram: forcedClientId ? telegram : (telegram ?? client.telegram),
       telegramAvatarFileId,
       ...(client.fullName.startsWith("Telegram ") ? { fullName: name } : {}),
     },
@@ -93,9 +93,16 @@ export async function syncTelegramClient(
 
 export async function createPortalLink(clientId: number) {
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await prisma.clientPortalLink.create({
-    data: { clientId, tokenHash: linkHash(token), expiresAt },
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  await prisma.$transaction(async (tx) => {
+    await tx.clientPortalLink.updateMany({
+      where: { clientId, expiresAt: { gt: now } },
+      data: { expiresAt: now },
+    });
+    await tx.clientPortalLink.create({
+      data: { clientId, tokenHash: linkHash(token), expiresAt },
+    });
   });
   return { token, expiresAt };
 }
@@ -108,14 +115,21 @@ export async function bindClientWithPortalToken(
   const link = await prisma.clientPortalLink.findUnique({
     where: { tokenHash: linkHash(token) },
   });
-  if (
-    link?.usedAt &&
-    link.usedByTelegramUserId === String(user.id)
-  ) {
-    return syncTelegramClient(user, link.clientId);
-  }
-  if (!link || link.usedAt || link.expiresAt <= now) {
+  if (!link || link.expiresAt <= now) {
     throw new Error("Ссылка недействительна или уже использована");
+  }
+  if (link.usedAt) {
+    const currentClient = await prisma.client.findUnique({
+      where: { id: link.clientId },
+      select: { telegramUserId: true },
+    });
+    if (
+      link.usedByTelegramUserId !== String(user.id) ||
+      currentClient?.telegramUserId !== String(user.id)
+    ) {
+      throw new Error("Ссылка недействительна или уже использована");
+    }
+    return syncTelegramClient(user, link.clientId);
   }
 
   const client = await syncTelegramClient(user, link.clientId);
