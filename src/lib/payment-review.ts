@@ -149,6 +149,79 @@ export async function rejectBookingPayment(
   return booking;
 }
 
+export async function cancelConfirmedBookingPayment(bookingId: number) {
+  return prisma.$transaction(async (tx) => {
+    const initial = await tx.botBooking.findUnique({
+      where: { id: bookingId },
+      include: { lesson: true },
+    });
+    if (!initial || !["confirmed", "credit"].includes(initial.status)) {
+      return { ok: false as const, reason: "changed" as const };
+    }
+    if (usesPostgres) {
+      await tx.$executeRaw`select pg_advisory_xact_lock(${initial.lessonId})`;
+    }
+    const booking = await tx.botBooking.findUnique({
+      where: { id: bookingId },
+      include: { lesson: true },
+    });
+    if (!booking || !["confirmed", "credit"].includes(booking.status)) {
+      return { ok: false as const, reason: "changed" as const };
+    }
+
+    if (booking.clientId) {
+      const attendance = await tx.attendance.findUnique({
+        where: {
+          lessonId_clientId: {
+            lessonId: booking.lessonId,
+            clientId: booking.clientId,
+          },
+        },
+      });
+      if (attendance?.status === "present") {
+        return { ok: false as const, reason: "visited" as const, booking };
+      }
+      if (attendance) {
+        await tx.attendance.delete({ where: { id: attendance.id } });
+      }
+    }
+
+    await tx.botBooking.update({
+      where: { id: booking.id },
+      data: {
+        status: "cancelled",
+        reminder3hSentAt: null,
+        reminder1hSentAt: null,
+      },
+    });
+
+    if (booking.kind === "trial" && booking.clientId) {
+      const [otherTrials, recordedTrials, subscriptions] = await Promise.all([
+        tx.botBooking.count({
+          where: {
+            id: { not: booking.id },
+            clientId: booking.clientId,
+            kind: "trial",
+            status: { in: ["confirmed", "credit"] },
+          },
+        }),
+        tx.singleVisit.count({
+          where: { clientId: booking.clientId, kind: "trial" },
+        }),
+        tx.subscription.count({ where: { clientId: booking.clientId } }),
+      ]);
+      if (otherTrials === 0 && recordedTrials === 0 && subscriptions === 0) {
+        await tx.client.updateMany({
+          where: { id: booking.clientId, status: "trial" },
+          data: { status: "lead" },
+        });
+      }
+    }
+
+    return { ok: true as const, booking };
+  });
+}
+
 export async function approveSubscriptionPayment(
   orderId: number,
   adminTelegramId: string,

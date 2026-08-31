@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getDashboard, startOfMonth, endOfMonth } from "@/lib/queries";
 import { addExpense, deleteExpense } from "@/lib/actions";
+import { reviewPaymentInCrm } from "@/lib/payment-actions";
 import {
   SUB_TYPE,
   SINGLE_VISIT_KIND,
@@ -9,9 +10,10 @@ import {
   EXPENSE_CATEGORIES,
   formatMoney,
   formatDate,
+  formatDateTime,
   type SubType,
 } from "@/lib/domain";
-import { Card, SectionTitle } from "@/components/ui";
+import { buttonClass, Card, SectionTitle } from "@/components/ui";
 import { Field, Input, SubmitButton } from "@/components/form";
 import { Disclosure } from "@/components/Disclosure";
 import { IconChevronRight, IconX, IconSparkle } from "@/components/icons";
@@ -85,6 +87,56 @@ export default async function FinancePage({
     where: { date: { gte: mStart, lte: mEnd } },
     orderBy: { date: "desc" },
   });
+
+  const [reviewBookings, reviewSubscriptions, reviewTrainers] = await Promise.all([
+    prisma.botBooking.findMany({
+      where: { status: "review", receiptFileId: { not: null } },
+      include: { client: true, lesson: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.subscriptionOrder.findMany({
+      where: { status: "review", receiptFileId: { not: null } },
+      include: { client: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.trainerOrder.findMany({
+      where: { status: "review", receiptFileId: { not: null } },
+      include: { client: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
+  const reviewPayments = [
+    ...reviewBookings.map((item) => ({
+      kind: "booking" as const,
+      id: item.id,
+      clientId: item.clientId,
+      name: item.client?.fullName || item.displayName || "Клиент из Telegram",
+      title: item.tariffName || "Занятие",
+      detail: `${formatDateTime(item.lesson.startsAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`,
+      amount: item.amount,
+      updatedAt: item.updatedAt,
+    })),
+    ...reviewSubscriptions.map((item) => ({
+      kind: "subscription" as const,
+      id: item.id,
+      clientId: item.clientId,
+      name: item.client.fullName,
+      title: item.tariffName,
+      detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
+      amount: item.amount,
+      updatedAt: item.updatedAt,
+    })),
+    ...reviewTrainers.map((item) => ({
+      kind: "trainer" as const,
+      id: item.id,
+      clientId: item.clientId,
+      name: item.client.fullName,
+      title: "Тренажёр «Волна»",
+      detail: "Покупка тренажёра",
+      amount: item.amount,
+      updatedAt: item.updatedAt,
+    })),
+  ].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
   const income = [
     ...subsMonth.map((s) => ({
@@ -169,6 +221,84 @@ export default async function FinancePage({
         <Big label="Расходы" value={formatMoney(expensesTotal)} />
         <Big label="Прибыль" value={formatMoney(profit)} accent />
       </div>
+
+      <section>
+        <SectionTitle
+          action={
+            reviewPayments.length > 0 ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                {reviewPayments.length} ждут
+              </span>
+            ) : undefined
+          }
+        >
+          Платежи на проверке
+        </SectionTitle>
+        {reviewPayments.length === 0 ? (
+          <Card className="p-5 text-sm text-muted">
+            Новых чеков на проверке нет.
+          </Card>
+        ) : (
+          <Card className="divide-y divide-line overflow-hidden p-0">
+            {reviewPayments.map((payment) => (
+              <div key={`${payment.kind}-${payment.id}`} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/clients/${payment.clientId}`}
+                      className="font-semibold text-ink hover:text-brand-dark"
+                    >
+                      {payment.name}
+                    </Link>
+                    <p className="mt-1 text-sm text-ink">{payment.title}</p>
+                    <p className="text-xs text-muted">{payment.detail}</p>
+                  </div>
+                  <span className="shrink-0 font-bold text-ink">
+                    {formatMoney(payment.amount)}
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <a
+                    href={`/api/payments/receipt?kind=${payment.kind}&id=${payment.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={buttonClass("soft", "sm")}
+                  >
+                    Открыть чек
+                  </a>
+                  <ConfirmActionForm
+                    action={reviewPaymentInCrm}
+                    message={`Подтвердить платёж ${payment.name} на ${formatMoney(payment.amount)}?`}
+                  >
+                    <input type="hidden" name="paymentKind" value={payment.kind} />
+                    <input type="hidden" name="paymentId" value={payment.id} />
+                    <input type="hidden" name="decision" value="approve" />
+                    <SubmitButton size="sm" pendingText="Подтверждаю…">
+                      Подтвердить
+                    </SubmitButton>
+                  </ConfirmActionForm>
+                  <ConfirmActionForm
+                    action={reviewPaymentInCrm}
+                    message={`Отклонить чек ${payment.name}? Клиент сможет загрузить новый.`}
+                  >
+                    <input type="hidden" name="paymentKind" value={payment.kind} />
+                    <input type="hidden" name="paymentId" value={payment.id} />
+                    <input type="hidden" name="decision" value="reject" />
+                    <SubmitButton
+                      variant="ghost"
+                      size="sm"
+                      pendingText="Отклоняю…"
+                      className="text-red-600 hover:bg-red-50"
+                    >
+                      Отклонить
+                    </SubmitButton>
+                  </ConfirmActionForm>
+                </div>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
 
       {/* Доходы за месяц */}
       <section>
