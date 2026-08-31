@@ -1089,6 +1089,7 @@ export async function POST(req: NextRequest) {
             telegramUserId: String(user.id),
             amount: TRAINER_PRICE_DEFAULT,
             profit: TRAINER_PROFIT_DEFAULT,
+            paymentFollowupEligibleAt: new Date(),
           },
         });
       }
@@ -1144,6 +1145,7 @@ export async function POST(req: NextRequest) {
           totalLessons,
           pricePerLesson: priceItem.price,
           amount: priceItem.price * totalLessons,
+          paymentFollowupEligibleAt: new Date(),
         },
       });
       return NextResponse.json({

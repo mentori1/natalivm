@@ -795,6 +795,7 @@ export async function createBooking(
             kind: quote.kind,
             tariffName: quote.tariffName,
             amount: quote.amount,
+            ...(quote.amount > 0 ? { paymentFollowupEligibleAt: now } : {}),
             holdExpiresAt:
               quote.amount === 0
                 ? lesson.startsAt
@@ -1529,7 +1530,7 @@ async function sendPendingPaymentFollowups(now: Date) {
     receiptFileId: null,
     paymentClaimedAt: null,
     paymentFollowupSentAt: null,
-    createdAt: { lte: cutoff },
+    paymentFollowupEligibleAt: { not: null, lte: cutoff },
   } as const;
   const [bookings, subscriptions, trainers] = await Promise.all([
     prisma.botBooking.findMany({

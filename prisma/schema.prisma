@@ -163,6 +163,7 @@ model SubscriptionOrder {
   receiptFileName      String?
   receiptMimeType      String?
   paymentClaimedAt     DateTime?
+  paymentFollowupEligibleAt DateTime?
   paymentFollowupSentAt DateTime?
   reviewedByTelegramId String?
   reviewedAt           DateTime?
@@ -188,6 +189,7 @@ model TrainerOrder {
   receiptFileName      String?
   receiptMimeType      String?
   paymentClaimedAt     DateTime?
+  paymentFollowupEligibleAt DateTime?
   paymentFollowupSentAt DateTime?
   reviewedByTelegramId String?
   reviewedAt           DateTime?
@@ -419,6 +421,7 @@ model BotBooking {
   receiptFileName        String?
   receiptMimeType        String?
   paymentClaimedAt       DateTime?
+  paymentFollowupEligibleAt DateTime?
   paymentFollowupSentAt  DateTime?
   holdExpiresAt          DateTime
   reviewedByTelegramId   String?
