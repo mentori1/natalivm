@@ -17,7 +17,10 @@ import {
   rejectSubscriptionPayment,
   rejectTrainerPayment,
 } from "@/lib/payment-review";
-import { withChannelRecommendation } from "@/lib/payment-copy";
+import {
+  withChannelRecommendation,
+  withOfflineIndividualPolicy,
+} from "@/lib/payment-copy";
 import { ensureDefaultPriceItems } from "@/lib/prices";
 import {
   createBooking,
@@ -56,6 +59,8 @@ type PortalPayment = {
   receiptName: string | null;
   receiptMimeType: string | null;
   clientName?: string;
+  type?: string;
+  format?: string;
 };
 
 type PortalLessonHistory = {
@@ -115,19 +120,6 @@ export async function GET(req: NextRequest) {
     const subscriptionTypes = new Set(
       fullClient.subscriptions.map((item) => item.type),
     );
-    const usableSubscriptionFormats = new Set(
-      subscriptionsWithStatus
-        .filter(
-          ({ item, status }) =>
-            (status === "active" || status === "ending") &&
-            !item.frozen &&
-            remaining(item) > 0,
-        )
-        .map(({ item }) => item.format),
-    );
-    const hasOnlyIndividualSubscription =
-      usableSubscriptionFormats.size === 1 &&
-      usableSubscriptionFormats.has("individual");
     const lessons = await prisma.lesson.findMany({
       where: { startsAt: { gte: now }, format: "group" },
       include: {
@@ -221,13 +213,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    const hasGroupBookingCredit = bookingPayments.some(
-      (item) => item.status === "credit" && item.holdExpiresAt > now,
-    );
-    const showGroupSchedule =
-      fullClient.status === "barter" ||
-      !hasOnlyIndividualSubscription ||
-      hasGroupBookingCredit;
+    const showGroupSchedule = true;
     const subscriptionPayments = await prisma.subscriptionOrder.findMany({
       where: {
         clientId: client.id,
@@ -268,6 +254,8 @@ export async function GET(req: NextRequest) {
         hasReceipt: Boolean(item.receiptFileId),
         receiptName: item.receiptFileName,
         receiptMimeType: item.receiptMimeType,
+        type: item.lesson.type,
+        format: item.lesson.format,
       })),
       ...subscriptionPayments.map((item) => ({
         kind: "subscription" as const,
@@ -281,6 +269,8 @@ export async function GET(req: NextRequest) {
         hasReceipt: Boolean(item.receiptFileId),
         receiptName: item.receiptFileName,
         receiptMimeType: item.receiptMimeType,
+        type: item.type,
+        format: item.format,
       })),
       ...trainerPayments.map((item) => ({
         kind: "trainer" as const,
@@ -408,7 +398,6 @@ export async function GET(req: NextRequest) {
     const adminBookingPayments = isAdmin
       ? await prisma.botBooking.findMany({
           where: {
-            receiptFileId: { not: null },
             status: { in: ["review", "confirmed", "rejected", "expired"] },
           },
           include: { lesson: true, client: true },
@@ -419,7 +408,6 @@ export async function GET(req: NextRequest) {
     const adminSubscriptionPayments = isAdmin
       ? await prisma.subscriptionOrder.findMany({
           where: {
-            receiptFileId: { not: null },
             status: { in: ["review", "confirmed", "rejected"] },
           },
           include: { client: true },
@@ -430,7 +418,6 @@ export async function GET(req: NextRequest) {
     const adminTrainerPayments = isAdmin
       ? await prisma.trainerOrder.findMany({
           where: {
-            receiptFileId: { not: null },
             status: { in: ["review", "confirmed", "rejected"] },
           },
           include: { client: true },
@@ -448,10 +435,12 @@ export async function GET(req: NextRequest) {
         status: item.status,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
-        hasReceipt: true,
+        hasReceipt: Boolean(item.receiptFileId),
         receiptName: item.receiptFileName,
         receiptMimeType: item.receiptMimeType,
         clientName: item.client?.fullName || item.displayName || "Клиент",
+        type: item.lesson.type,
+        format: item.lesson.format,
       })),
       ...adminSubscriptionPayments.map((item) => ({
         kind: "subscription" as const,
@@ -462,10 +451,12 @@ export async function GET(req: NextRequest) {
         status: item.status,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
-        hasReceipt: true,
+        hasReceipt: Boolean(item.receiptFileId),
         receiptName: item.receiptFileName,
         receiptMimeType: item.receiptMimeType,
         clientName: item.client.fullName,
+        type: item.type,
+        format: item.format,
       })),
       ...adminTrainerPayments.map((item) => ({
         kind: "trainer" as const,
@@ -476,7 +467,7 @@ export async function GET(req: NextRequest) {
         status: item.status,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
-        hasReceipt: true,
+        hasReceipt: Boolean(item.receiptFileId),
         receiptName: item.receiptFileName,
         receiptMimeType: item.receiptMimeType,
         clientName: item.client.fullName,
@@ -571,6 +562,7 @@ export async function GET(req: NextRequest) {
           expiresAt: item.holdExpiresAt.toISOString(),
         })),
       lessons: availableLessons,
+      nextGroupLesson: availableLessons[0] ?? null,
       scheduledLessons: scheduledAttendances.map((attendance) => ({
         attendanceId: attendance.id,
         lessonId: attendance.lessonId,
@@ -652,6 +644,131 @@ export async function POST(req: NextRequest) {
       availability?: unknown;
     };
 
+    if (body.action === "markPaymentPaid") {
+      const id = Number(body.paymentId);
+      if (!Number.isInteger(id) || id < 1 || !body.paymentKind) {
+        throw new Error("Платёж не найден");
+      }
+      const admins = [...telegramAdminIds()];
+      if (admins.length === 0) throw new Error("Администратор оплаты не настроен");
+      const now = new Date();
+      let title = "";
+      let amount = 0;
+      let callbackPrefix = "";
+      let hasReceipt = false;
+
+      if (body.paymentKind === "booking") {
+        const booking = await prisma.botBooking.findFirst({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          include: { lesson: true },
+        });
+        if (!booking || booking.lesson.startsAt <= now) {
+          throw new Error("Бронь уже не действует. Выберите занятие ещё раз");
+        }
+        const reviewUntil = new Date(
+          Math.min(booking.lesson.startsAt.getTime(), now.getTime() + 12 * 60 * 60 * 1000),
+        );
+        const changed = await prisma.botBooking.updateMany({
+          where: {
+            id: booking.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          data: {
+            status: "review",
+            paymentClaimedAt: now,
+            paymentFollowupSentAt: now,
+            holdExpiresAt: reviewUntil,
+            reviewedAt: null,
+            reviewedByTelegramId: null,
+          },
+        });
+        if (!changed.count) throw new Error("Этот платёж уже отправлен на проверку");
+        title = `${booking.tariffName || "Занятие"}\n${formatDateTime(booking.lesson.startsAt)} · ${booking.lesson.type === "online" ? "онлайн" : "офлайн"}`;
+        amount = booking.amount;
+        hasReceipt = Boolean(booking.receiptFileId);
+      } else if (body.paymentKind === "subscription") {
+        const order = await prisma.subscriptionOrder.findFirst({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+        });
+        if (!order) throw new Error("Этот платёж уже отправлен или отменён");
+        const changed = await prisma.subscriptionOrder.updateMany({
+          where: {
+            id: order.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          data: {
+            status: "review",
+            paymentClaimedAt: now,
+            paymentFollowupSentAt: now,
+            reviewedAt: null,
+            reviewedByTelegramId: null,
+          },
+        });
+        if (!changed.count) throw new Error("Этот платёж уже отправлен на проверку");
+        title = `${order.tariffName}\n${order.totalLessons} занятий · ${order.type === "online" ? "онлайн" : "офлайн"}`;
+        amount = order.amount;
+        hasReceipt = Boolean(order.receiptFileId);
+        callbackPrefix = "-sub";
+      } else {
+        const order = await prisma.trainerOrder.findFirst({
+          where: {
+            id,
+            clientId: client.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+        });
+        if (!order) throw new Error("Этот платёж уже отправлен или отменён");
+        const changed = await prisma.trainerOrder.updateMany({
+          where: {
+            id: order.id,
+            status: { in: ["awaiting_receipt", "rejected"] },
+          },
+          data: {
+            status: "review",
+            paymentClaimedAt: now,
+            paymentFollowupSentAt: now,
+            reviewedAt: null,
+            reviewedByTelegramId: null,
+          },
+        });
+        if (!changed.count) throw new Error("Этот платёж уже отправлен на проверку");
+        title = "Тренажёр «Волна»";
+        amount = order.amount;
+        hasReceipt = Boolean(order.receiptFileId);
+        callbackPrefix = "-trainer";
+      }
+
+      const message =
+        `Клиент отметил оплату${hasReceipt ? "" : " без чека"} №${id}\n\n${client.fullName}\n${title}\n${amount.toLocaleString("ru-RU")} ₽`;
+      const replyMarkup = {
+        inline_keyboard: [[
+          {
+            text: "Подтвердить",
+            callback_data: `admin:approve${callbackPrefix}:${id}`,
+          },
+          {
+            text: "Отклонить",
+            callback_data: `admin:reject${callbackPrefix}:${id}`,
+          },
+        ]],
+      };
+      await Promise.allSettled(
+        admins.map((adminId) => sendTelegramMessage(adminId, message, replyMarkup)),
+      );
+      return NextResponse.json({
+        ok: true,
+        message: "Оплата отправлена на проверку",
+      });
+    }
+
     if (body.action === "saveIndividualAvailability") {
       const subscriptionId = Number(body.subscriptionId);
       if (!Number.isInteger(subscriptionId) || subscriptionId < 1) {
@@ -706,7 +823,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         message: result.late
-          ? "Занятие отменено и списано, потому что осталось меньше 30 минут"
+          ? `Занятие отменено и списано, потому что осталось меньше ${result.cancellationWindow}`
           : "Занятие отменено без списания",
       });
     }
@@ -721,7 +838,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         message: result.late
-          ? "Новая дата сохранена, прежнее занятие списано по правилу 30 минут"
+          ? `Новая дата сохранена, прежнее занятие списано по правилу ${result.cancellationWindow}`
           : "Занятие перенесено без списания",
       });
     }
@@ -858,7 +975,11 @@ export async function POST(req: NextRequest) {
         await sendTelegramMessage(
           result.order.telegramChatId,
           withChannelRecommendation(
-            `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+            withOfflineIndividualPolicy(
+              `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+              result.order.type,
+              result.order.format,
+            ),
           ),
         ).catch(() => undefined);
         return NextResponse.json({ ok: true, message: "Абонемент активирован" });
@@ -936,7 +1057,7 @@ export async function POST(req: NextRequest) {
         paymentRequired: booking?.status === "awaiting_receipt" || booking?.status === "review",
         message:
           booking?.status === "awaiting_receipt"
-            ? "Место сохранено. Оплатите и прикрепите чек."
+            ? "Место сохранено. Оплатите и нажмите «Я оплатил» или прикрепите чек."
             : "Вы записаны на занятие",
       });
     }
@@ -976,7 +1097,7 @@ export async function POST(req: NextRequest) {
         paymentRequired: true,
         message: existing?.status === "review"
           ? "Чек уже находится на проверке"
-          : "Заявка создана. Оплатите и прикрепите чек в личном кабинете.",
+          : "Заявка создана. Оплатите и нажмите «Я оплатил» или прикрепите чек.",
       });
     }
 
@@ -1028,7 +1149,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         paymentRequired: true,
-        message: "Заявка создана. Оплатите и прикрепите чек в личном кабинете.",
+        message: "Заявка создана. Оплатите и нажмите «Я оплатил» или прикрепите чек.",
       });
     }
 

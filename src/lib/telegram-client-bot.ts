@@ -18,7 +18,10 @@ import {
   rejectSubscriptionPayment,
   rejectTrainerPayment,
 } from "@/lib/payment-review";
-import { withChannelRecommendation } from "@/lib/payment-copy";
+import {
+  withChannelRecommendation,
+  withOfflineIndividualPolicy,
+} from "@/lib/payment-copy";
 import {
   bindClientWithPortalToken,
   findClientByTelegram,
@@ -903,6 +906,8 @@ async function acceptSubscriptionReceipt(
       receiptFileId: file.id,
       receiptFileName: file.name,
       receiptMimeType: file.mime,
+      paymentClaimedAt: new Date(),
+      paymentFollowupSentAt: new Date(),
     },
   });
   await replaceScreen(
@@ -957,6 +962,8 @@ async function acceptTrainerReceipt(
       receiptFileId: file.id,
       receiptFileName: file.name,
       receiptMimeType: file.mime,
+      paymentClaimedAt: new Date(),
+      paymentFollowupSentAt: new Date(),
     },
   });
   await replaceScreen(
@@ -1084,6 +1091,8 @@ async function acceptReceipt(message: TelegramMessage) {
       receiptFileId: file.id,
       receiptFileName: file.name,
       receiptMimeType: file.mime,
+      paymentClaimedAt: now,
+      paymentFollowupSentAt: now,
       holdExpiresAt: reviewUntil,
     },
   });
@@ -1226,7 +1235,11 @@ async function approveSubscriptionOrder(
   await replaceScreen(
     result.order.telegramChatId,
     withChannelRecommendation(
-      `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+      withOfflineIndividualPolicy(
+        `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+        result.order.type,
+        result.order.format,
+      ),
     ),
   );
 }
@@ -1493,12 +1506,128 @@ function reminderPlace(
   return address ? copy.text("meetingAddress", { value: address }) : "";
 }
 
+function paymentFollowupText(name: string | null | undefined) {
+  const greeting = name?.trim() ? `${name.trim()}, добрый день.` : "Добрый день.";
+  return `${greeting} Вы открывали оплату, но мы пока не получили чек или подтверждение. Если перевод уже сделан, откройте личный кабинет и нажмите «Я оплатил». Если оплатить не получилось, реквизиты доступны там же.`;
+}
+
+function paymentFollowupMarkup() {
+  const miniAppUrl = process.env.MINIAPP_URL?.trim();
+  return miniAppUrl
+    ? {
+        inline_keyboard: [[
+          { text: "Вернуться к оплате", web_app: { url: miniAppUrl } },
+        ]],
+      }
+    : undefined;
+}
+
+async function sendPendingPaymentFollowups(now: Date) {
+  const cutoff = new Date(now.getTime() - 30 * MINUTE);
+  const commonWhere = {
+    status: "awaiting_receipt",
+    receiptFileId: null,
+    paymentClaimedAt: null,
+    paymentFollowupSentAt: null,
+    createdAt: { lte: cutoff },
+  } as const;
+  const [bookings, subscriptions, trainers] = await Promise.all([
+    prisma.botBooking.findMany({
+      where: {
+        ...commonWhere,
+        lesson: { startsAt: { gt: now } },
+      },
+      include: { client: { select: { fullName: true } }, lesson: true },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    }),
+    prisma.subscriptionOrder.findMany({
+      where: commonWhere,
+      include: { client: { select: { fullName: true } } },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    }),
+    prisma.trainerOrder.findMany({
+      where: commonWhere,
+      include: { client: { select: { fullName: true } } },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    }),
+  ]);
+  const replyMarkup = paymentFollowupMarkup();
+
+  for (const booking of bookings) {
+    try {
+      await sendTelegramMessage(
+        booking.telegramChatId,
+        paymentFollowupText(booking.client?.fullName || booking.displayName),
+        replyMarkup,
+      );
+      const extendedHold = new Date(
+        Math.min(booking.lesson.startsAt.getTime(), now.getTime() + 30 * MINUTE),
+      );
+      await prisma.botBooking.updateMany({
+        where: {
+          id: booking.id,
+          status: "awaiting_receipt",
+          paymentFollowupSentAt: null,
+        },
+        data: {
+          paymentFollowupSentAt: new Date(),
+          holdExpiresAt: extendedHold,
+        },
+      });
+    } catch {
+      // Повторим в следующем цикле, если Telegram временно недоступен.
+    }
+  }
+  for (const order of subscriptions) {
+    try {
+      await sendTelegramMessage(
+        order.telegramChatId,
+        paymentFollowupText(order.client.fullName),
+        replyMarkup,
+      );
+      await prisma.subscriptionOrder.updateMany({
+        where: {
+          id: order.id,
+          status: "awaiting_receipt",
+          paymentFollowupSentAt: null,
+        },
+        data: { paymentFollowupSentAt: new Date() },
+      });
+    } catch {
+      // Повторим в следующем цикле, если Telegram временно недоступен.
+    }
+  }
+  for (const order of trainers) {
+    try {
+      await sendTelegramMessage(
+        order.telegramChatId,
+        paymentFollowupText(order.client.fullName),
+        replyMarkup,
+      );
+      await prisma.trainerOrder.updateMany({
+        where: {
+          id: order.id,
+          status: "awaiting_receipt",
+          paymentFollowupSentAt: null,
+        },
+        data: { paymentFollowupSentAt: new Date() },
+      });
+    } catch {
+      // Повторим в следующем цикле, если Telegram временно недоступен.
+    }
+  }
+}
+
 export async function runClientBookingReminders() {
-  await expireOldHolds(true);
   const settings = await getBotSettings();
   const copy = await getBotCopy();
   if (!settings.enabled) return;
   const now = currentMoscowWallClockDate();
+  await sendPendingPaymentFollowups(now);
+  await expireOldHolds(false);
   const max = new Date(now.getTime() + 2 * HOUR + 10 * MINUTE);
   const min = new Date(now.getTime() - 15 * MINUTE);
   const bookings = await prisma.botBooking.findMany({

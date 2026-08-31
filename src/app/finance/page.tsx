@@ -90,17 +90,17 @@ export default async function FinancePage({
 
   const [reviewBookings, reviewSubscriptions, reviewTrainers] = await Promise.all([
     prisma.botBooking.findMany({
-      where: { status: "review", receiptFileId: { not: null } },
+      where: { status: "review" },
       include: { client: true, lesson: true },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.subscriptionOrder.findMany({
-      where: { status: "review", receiptFileId: { not: null } },
+      where: { status: "review" },
       include: { client: true },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.trainerOrder.findMany({
-      where: { status: "review", receiptFileId: { not: null } },
+      where: { status: "review" },
       include: { client: true },
       orderBy: { updatedAt: "desc" },
     }),
@@ -115,6 +115,7 @@ export default async function FinancePage({
       detail: `${formatDateTime(item.lesson.startsAt)} · ${item.lesson.type === "online" ? "онлайн" : "офлайн"}`,
       amount: item.amount,
       updatedAt: item.updatedAt,
+      hasReceipt: Boolean(item.receiptFileId),
     })),
     ...reviewSubscriptions.map((item) => ({
       kind: "subscription" as const,
@@ -125,6 +126,7 @@ export default async function FinancePage({
       detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
       amount: item.amount,
       updatedAt: item.updatedAt,
+      hasReceipt: Boolean(item.receiptFileId),
     })),
     ...reviewTrainers.map((item) => ({
       kind: "trainer" as const,
@@ -135,6 +137,7 @@ export default async function FinancePage({
       detail: "Покупка тренажёра",
       amount: item.amount,
       updatedAt: item.updatedAt,
+      hasReceipt: Boolean(item.receiptFileId),
     })),
   ].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
@@ -258,14 +261,20 @@ export default async function FinancePage({
                   </span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <a
-                    href={`/api/payments/receipt?kind=${payment.kind}&id=${payment.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={buttonClass("soft", "sm")}
-                  >
-                    Открыть чек
-                  </a>
+                  {payment.hasReceipt ? (
+                    <a
+                      href={`/api/payments/receipt?kind=${payment.kind}&id=${payment.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonClass("soft", "sm")}
+                    >
+                      Открыть чек
+                    </a>
+                  ) : (
+                    <span className="rounded-full bg-brand-tint px-3 py-2 text-xs font-semibold text-muted">
+                      Чек не приложен
+                    </span>
+                  )}
                   <ConfirmActionForm
                     action={reviewPaymentInCrm}
                     message={`Подтвердить платёж ${payment.name} на ${formatMoney(payment.amount)}?`}

@@ -13,7 +13,18 @@ import {
   telegramAdminIds,
 } from "@/lib/telegram-api";
 
-const CANCELLATION_LIMIT_MS = 30 * 60 * 1000;
+const ONLINE_INDIVIDUAL_CANCELLATION_LIMIT_MS = 30 * 60 * 1000;
+const OFFLINE_INDIVIDUAL_CANCELLATION_LIMIT_MS = 12 * 60 * 60 * 1000;
+
+function individualCancellationLimit(type: string) {
+  return type === "offline"
+    ? OFFLINE_INDIVIDUAL_CANCELLATION_LIMIT_MS
+    : ONLINE_INDIVIDUAL_CANCELLATION_LIMIT_MS;
+}
+
+function individualCancellationWindow(type: string) {
+  return type === "offline" ? "12 часов" : "30 минут";
+}
 
 async function notifyAdmins(message: string) {
   await Promise.allSettled(
@@ -173,7 +184,9 @@ export async function cancelIndividualLesson(clientId: number, attendanceId: num
     if (attendance.lesson.startsAt <= now) {
       throw new Error("Прошедшее занятие отменить нельзя");
     }
-    const late = attendance.lesson.startsAt.getTime() - now.getTime() < CANCELLATION_LIMIT_MS;
+    const late =
+      attendance.lesson.startsAt.getTime() - now.getTime() <
+      individualCancellationLimit(attendance.lesson.type);
     if (!late) {
       await tx.lesson.delete({ where: { id: attendance.lessonId } });
     } else {
@@ -214,10 +227,11 @@ export async function cancelIndividualLesson(clientId: number, attendanceId: num
       clientName: attendance.client.fullName,
       startsAt: attendance.lesson.startsAt,
       type: attendance.lesson.type,
+      cancellationWindow: individualCancellationWindow(attendance.lesson.type),
     };
   });
   await notifyAdmins(
-    `${result.clientName} отменила индивидуальное занятие ${formatDateTime(result.startsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.${result.late ? " Отмена менее чем за 30 минут, занятие списано." : " Отмена вовремя, занятие не списано."}`,
+    `${result.clientName} отменила индивидуальное занятие ${formatDateTime(result.startsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.${result.late ? ` Отмена менее чем за ${result.cancellationWindow}, занятие списано.` : " Отмена вовремя, занятие не списано."}`,
   );
   return result;
 }
@@ -260,7 +274,9 @@ export async function rescheduleIndividualLesson(
     await lockNumber(tx, attendance.plannedSubscription.id);
     await ensureIndividualTimeIsFree(tx, startsAt, attendance.lessonId);
 
-    const late = attendance.lesson.startsAt.getTime() - now.getTime() < CANCELLATION_LIMIT_MS;
+    const late =
+      attendance.lesson.startsAt.getTime() - now.getTime() <
+      individualCancellationLimit(attendance.lesson.type);
     const usedLessons =
       attendance.plannedSubscription.usedLessons + (late ? 1 : 0);
     const otherScheduled = await tx.attendance.count({
@@ -359,10 +375,11 @@ export async function rescheduleIndividualLesson(
       oldStartsAt: attendance.lesson.startsAt,
       newStartsAt: newLesson.startsAt,
       type: attendance.lesson.type,
+      cancellationWindow: individualCancellationWindow(attendance.lesson.type),
     };
   });
   await notifyAdmins(
-    `${result.clientName} перенесла индивидуальное занятие: ${formatDateTime(result.oldStartsAt)} → ${formatDateTime(result.newStartsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.${result.late ? " Перенос менее чем за 30 минут, прежнее занятие списано." : " Занятие не списано."}`,
+    `${result.clientName} перенесла индивидуальное занятие: ${formatDateTime(result.oldStartsAt)} → ${formatDateTime(result.newStartsAt)}, ${result.type === "online" ? "онлайн" : "офлайн"}.${result.late ? ` Перенос менее чем за ${result.cancellationWindow}, прежнее занятие списано.` : " Занятие не списано."}`,
   );
   return result;
 }

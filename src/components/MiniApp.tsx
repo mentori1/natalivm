@@ -8,12 +8,8 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from "react";
-import {
-  INDIVIDUAL_WEEKDAYS,
-  type IndividualAvailabilitySlot,
-} from "@/lib/individual-availability";
+import { OFFLINE_INDIVIDUAL_PAYMENT_POLICY } from "@/lib/payment-copy";
 
 type Tab = "home" | "schedule" | "subscriptions" | "trainer" | "profile" | "payments" | "admin";
 type LessonType = "online" | "offline";
@@ -31,6 +27,8 @@ type Payment = {
   receiptName: string | null;
   receiptMimeType: string | null;
   clientName?: string;
+  type?: string;
+  format?: string;
 };
 type PortalData = {
   user: { firstName: string; photoUrl: string | null; username: string | null };
@@ -48,8 +46,6 @@ type PortalData = {
     status: string;
     frozen: boolean;
     scheduledLessons: number;
-    availability: IndividualAvailabilitySlot[];
-    availabilityUpdatedAt: string | null;
   }>;
   hasSubscriptionHistory: boolean;
   bookingCredits: Array<{
@@ -66,6 +62,13 @@ type PortalData = {
     startsAt: string;
     free: number | null;
   }>;
+  nextGroupLesson: {
+    id: number;
+    title: string;
+    type: LessonType;
+    startsAt: string;
+    free: number | null;
+  } | null;
   bookings: Array<{
     id: number;
     lessonId: number;
@@ -252,9 +255,6 @@ export function MiniApp() {
   const [lessonCounts, setLessonCounts] = useState<Record<number, number>>({});
   const [uploadingPayment, setUploadingPayment] = useState("");
   const [adminFilter, setAdminFilter] = useState<"review" | "confirmed" | "rejected">("review");
-  const [individualAvailability, setIndividualAvailability] = useState<
-    Record<number, IndividualAvailabilitySlot[]>
-  >({});
   const [editDates, setEditDates] = useState<Record<number, string>>({});
   const [editingLesson, setEditingLesson] = useState<number | null>(null);
   const [transferTargets, setTransferTargets] = useState<Record<number, number>>({});
@@ -428,13 +428,6 @@ export function MiniApp() {
       setLessonCounts(
         Object.fromEntries(result.prices.map((price) => [price.id, price.minLessons])),
       );
-      setIndividualAvailability(
-        Object.fromEntries(
-          result.subscriptions
-            .filter((subscription) => subscription.format === "individual")
-            .map((subscription) => [subscription.id, subscription.availability]),
-        ),
-      );
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Не удалось открыть кабинет");
     } finally {
@@ -568,32 +561,6 @@ export function MiniApp() {
     }, 80);
   }
 
-  function toggleAvailabilityDay(subscriptionId: number, weekday: number) {
-    setIndividualAvailability((current) => {
-      const slots = current[subscriptionId] || [];
-      const exists = slots.some((slot) => slot.weekday === weekday);
-      const next = exists
-        ? slots.filter((slot) => slot.weekday !== weekday)
-        : [...slots, { weekday, from: "18:00", to: "21:00" }]
-            .sort((a, b) => a.weekday - b.weekday);
-      return { ...current, [subscriptionId]: next };
-    });
-  }
-
-  function updateAvailabilityTime(
-    subscriptionId: number,
-    weekday: number,
-    key: "from" | "to",
-    value: string,
-  ) {
-    setIndividualAvailability((current) => ({
-      ...current,
-      [subscriptionId]: (current[subscriptionId] || []).map((slot) =>
-        slot.weekday === weekday ? { ...slot, [key]: value } : slot,
-      ),
-    }));
-  }
-
   const filteredLessons = useMemo(
     () => data?.lessons.filter((lesson) => lesson.type === type) || [],
     [data, type],
@@ -607,12 +574,23 @@ export function MiniApp() {
   const selectedBookingPrice = data?.prices.find(
     (price) => price.id === selectedBookingPriceId,
   );
-  const nextBooking = data?.scheduledLessons[0] ||
-    data?.bookings.find((booking) => booking.status === "confirmed");
   const bookedLessonIds = new Set([
     ...(data?.bookings.map((booking) => booking.lessonId) || []),
     ...(data?.scheduledLessons.map((lesson) => lesson.lessonId) || []),
   ]);
+  const personalNextLesson = data?.scheduledLessons[0] ||
+    data?.bookings.find((booking) => booking.status === "confirmed");
+  const nextGroupLesson = data?.nextGroupLesson
+    ? {
+        lessonId: data.nextGroupLesson.id,
+        startsAt: data.nextGroupLesson.startsAt,
+        type: data.nextGroupLesson.type,
+        title: data.nextGroupLesson.title,
+      }
+    : null;
+  const nextLesson = [personalNextLesson, nextGroupLesson]
+    .filter((lesson): lesson is NonNullable<typeof lesson> => Boolean(lesson))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
   const payablePayments = data?.payments.filter((payment) =>
     ["awaiting_receipt", "rejected"].includes(payment.status),
   ) || [];
@@ -700,29 +678,34 @@ export function MiniApp() {
         {tab === "home" && (
           <div className="space-y-6">
             <section
-              className={`miniapp-hero ${nextBooking ? "is-clickable" : ""}`}
-              role={nextBooking ? "button" : undefined}
-              tabIndex={nextBooking ? 0 : undefined}
-              aria-label={nextBooking ? "Открыть ближайшее занятие" : undefined}
-              onClick={nextBooking ? () => {
-                setHighlightedLessonId(nextBooking.lessonId);
+              className={`miniapp-hero ${nextLesson ? "is-clickable" : ""}`}
+              role={nextLesson ? "button" : undefined}
+              tabIndex={nextLesson ? 0 : undefined}
+              aria-label={nextLesson ? "Открыть ближайшее занятие" : undefined}
+              onClick={nextLesson ? () => {
+                setType(nextLesson.type);
+                setHighlightedLessonId(nextLesson.lessonId);
                 setTab("schedule");
               } : undefined}
-              onKeyDown={nextBooking ? (event) => {
+              onKeyDown={nextLesson ? (event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  setHighlightedLessonId(nextBooking.lessonId);
+                  setType(nextLesson.type);
+                  setHighlightedLessonId(nextLesson.lessonId);
                   setTab("schedule");
                 }
               } : undefined}
             >
               <div className="miniapp-hero-glass">
                 <p className="text-xs font-semibold uppercase opacity-60">Ближайшее занятие</p>
-                {nextBooking ? (
+                {nextLesson ? (
                   <>
-                    <p className="mt-3 text-3xl font-bold">{formatScheduleDate(nextBooking.startsAt)}</p>
+                    <p className="mt-3 text-3xl font-bold">{formatScheduleDate(nextLesson.startsAt)}</p>
                     <p className="mt-1 opacity-75">
-                      {nextBooking.type === "online" ? "Онлайн" : "Офлайн"} · {nextBooking.title}
+                      {nextLesson.type === "online" ? "Онлайн" : "Офлайн"} · {nextLesson.title}
+                    </p>
+                    <p className="mt-3 text-xs font-semibold opacity-65">
+                      {bookedLessonIds.has(nextLesson.lessonId) ? "Вы записаны" : "Можно записаться"}
                     </p>
                   </>
                 ) : data.bookingCredits.length ? (
@@ -781,7 +764,7 @@ export function MiniApp() {
                   <small>Оплата</small>
                   <strong>
                     {payablePayments.length
-                      ? "Отправьте чек в бот"
+                      ? "Подтвердите оплату или отправьте чек"
                       : "Чек находится на проверке"}
                   </strong>
                 </span>
@@ -902,6 +885,11 @@ export function MiniApp() {
                       <div className="mt-4">
                         {editingLesson === lesson.attendanceId ? (
                           <div className="miniapp-reschedule-box">
+                            <p className="mb-3 text-xs leading-relaxed opacity-60">
+                              {lesson.type === "offline"
+                                ? "Офлайн-занятие можно перенести без списания не позднее чем за 12 часов."
+                                : "Онлайн-занятие можно перенести без списания не позднее чем за 30 минут."}
+                            </p>
                             <input
                               type="datetime-local"
                               value={editDates[lesson.attendanceId] || dateTimeInput(lesson.startsAt)}
@@ -920,13 +908,17 @@ export function MiniApp() {
                               <button
                                 disabled={busy}
                                 className="miniapp-approve-button"
-                                onClick={() => void action({
-                                  action: "rescheduleIndividual",
-                                  attendanceId: lesson.attendanceId,
-                                  startsAt: editDates[lesson.attendanceId] || dateTimeInput(lesson.startsAt),
-                                }).then((result) => {
-                                  if (result) setEditingLesson(null);
-                                })}
+                                onClick={() => {
+                                  const limit = lesson.type === "offline" ? "12 часов" : "30 минут";
+                                  if (!window.confirm(`Перенести занятие? Если до начала меньше ${limit}, прежнее занятие спишется.`)) return;
+                                  void action({
+                                    action: "rescheduleIndividual",
+                                    attendanceId: lesson.attendanceId,
+                                    startsAt: editDates[lesson.attendanceId] || dateTimeInput(lesson.startsAt),
+                                  }).then((result) => {
+                                    if (result) setEditingLesson(null);
+                                  });
+                                }}
                               >
                                 Сохранить
                               </button>
@@ -938,7 +930,8 @@ export function MiniApp() {
                               disabled={busy}
                               className="miniapp-decline-button"
                               onClick={() => {
-                                if (window.confirm("Отменить занятие? Если до начала меньше 30 минут, оно спишется с абонемента.")) {
+                                const limit = lesson.type === "offline" ? "12 часов" : "30 минут";
+                                if (window.confirm(`Отменить занятие? Если до начала меньше ${limit}, оно спишется с абонемента.`)) {
                                   void action({
                                     action: "cancelIndividual",
                                     attendanceId: lesson.attendanceId,
@@ -1167,25 +1160,7 @@ export function MiniApp() {
             {data.subscriptions.length > 0 && (
               <div className="mt-4 space-y-3">
                 {data.subscriptions.map((subscription) => (
-                  <SubscriptionCard key={subscription.id} subscription={subscription}>
-                    {subscription.format === "individual" && (
-                      <IndividualAvailabilityEditor
-                        slots={individualAvailability[subscription.id] || []}
-                        busy={busy}
-                        onToggleDay={(weekday) =>
-                          toggleAvailabilityDay(subscription.id, weekday)
-                        }
-                        onTimeChange={(weekday, key, value) =>
-                          updateAvailabilityTime(subscription.id, weekday, key, value)
-                        }
-                        onSave={() => void action({
-                          action: "saveIndividualAvailability",
-                          subscriptionId: subscription.id,
-                          availability: individualAvailability[subscription.id] || [],
-                        })}
-                      />
-                    )}
-                  </SubscriptionCard>
+                  <SubscriptionCard key={subscription.id} subscription={subscription} />
                 ))}
               </div>
             )}
@@ -1347,6 +1322,27 @@ export function MiniApp() {
                       <p className="mt-3 text-xs opacity-55">
                         Чек из диалога с ботом прикрепится сюда автоматически.
                       </p>
+                      {payment.type === "offline" && payment.format === "individual" && (
+                        <p className="mt-3 text-xs leading-relaxed opacity-70">
+                          {OFFLINE_INDIVIDUAL_PAYMENT_POLICY}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busy || Boolean(uploadingPayment)}
+                        className="miniapp-approve-button mt-4 w-full"
+                        onClick={() => {
+                          if (window.confirm("Подтвердить, что перевод уже выполнен?")) {
+                            void action({
+                              action: "markPaymentPaid",
+                              paymentKind: payment.kind,
+                              paymentId: payment.id,
+                            });
+                          }
+                        }}
+                      >
+                        Я оплатил
+                      </button>
                       <label className="miniapp-upload mt-4">
                         {uploadingPayment === key ? "Отправляю..." : payment.status === "rejected" ? "Или загрузить новый чек здесь" : "Или прикрепить чек здесь"}
                         <input
@@ -1471,13 +1467,19 @@ export function MiniApp() {
                       </div>
                       <strong className="shrink-0">{money(payment.amount)}</strong>
                     </div>
-                    <button
-                      disabled={busy}
-                      className="miniapp-receipt-button mt-4 w-full"
-                      onClick={() => void openReceipt(payment)}
-                    >
-                      Посмотреть чек
-                    </button>
+                    {payment.hasReceipt ? (
+                      <button
+                        disabled={busy}
+                        className="miniapp-receipt-button mt-4 w-full"
+                        onClick={() => void openReceipt(payment)}
+                      >
+                        Посмотреть чек
+                      </button>
+                    ) : (
+                      <p className="mt-4 text-sm font-semibold opacity-60">
+                        Клиент отметил оплату, чек не приложен
+                      </p>
+                    )}
                     {payment.status === "review" && (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
@@ -1678,12 +1680,8 @@ export function MiniApp() {
   );
 }
 
-function SubscriptionCard({
-  subscription,
-  children,
-}: {
+function SubscriptionCard({ subscription }: {
   subscription: PortalData["subscriptions"][number];
-  children?: ReactNode;
 }) {
   const progress = subscription.unlimited
     ? 100
@@ -1707,104 +1705,6 @@ function SubscriptionCard({
         <span>{STATUS[subscription.status] || subscription.status}</span>
         <span>{subscription.unlimited ? "без срока" : `до ${formatDate(subscription.expiresAt)}`}</span>
       </div>
-      {children}
     </article>
-  );
-}
-
-function IndividualAvailabilityEditor({
-  slots,
-  busy,
-  onToggleDay,
-  onTimeChange,
-  onSave,
-}: {
-  slots: IndividualAvailabilitySlot[];
-  busy: boolean;
-  onToggleDay(weekday: number): void;
-  onTimeChange(weekday: number, key: "from" | "to", value: string): void;
-  onSave(): void;
-}) {
-  const invalid = slots.some((slot) => !slot.from || !slot.to || slot.from >= slot.to);
-  return (
-    <details className="miniapp-availability">
-      <summary>
-        <span>
-          <b>Удобные дни и время</b>
-          <small>
-            {slots.length
-              ? `${slots.length} ${slots.length === 1 ? "день выбран" : slots.length < 5 ? "дня выбрано" : "дней выбрано"}`
-              : "Укажите пожелания преподавателю"}
-          </small>
-        </span>
-        <i aria-hidden="true">⌄</i>
-      </summary>
-      <div className="miniapp-availability-body">
-        <p>
-          Выберите подходящие дни и интервалы. Наталья сверит свободные окна и поставит конкретные занятия.
-        </p>
-        <div className="miniapp-availability-days" aria-label="Удобные дни недели">
-          {INDIVIDUAL_WEEKDAYS.map((day) => {
-            const selected = slots.some((slot) => slot.weekday === day.value);
-            return (
-              <button
-                key={day.value}
-                type="button"
-                className={selected ? "active" : ""}
-                aria-pressed={selected}
-                onClick={() => onToggleDay(day.value)}
-              >
-                {day.short}
-              </button>
-            );
-          })}
-        </div>
-        {slots.length > 0 && (
-          <div className="miniapp-availability-times">
-            {slots.map((slot) => {
-              const day = INDIVIDUAL_WEEKDAYS.find((item) => item.value === slot.weekday);
-              return (
-                <div key={slot.weekday}>
-                  <strong>{day?.label}</strong>
-                  <label>
-                    <span>с</span>
-                    <input
-                      type="time"
-                      value={slot.from}
-                      onChange={(event) =>
-                        onTimeChange(slot.weekday, "from", event.target.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>до</span>
-                    <input
-                      type="time"
-                      value={slot.to}
-                      onChange={(event) =>
-                        onTimeChange(slot.weekday, "to", event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {invalid && (
-          <p className="miniapp-availability-error">
-            Время окончания должно быть позже времени начала.
-          </p>
-        )}
-        <button
-          type="button"
-          disabled={busy || invalid}
-          className="miniapp-small-button w-full"
-          onClick={onSave}
-        >
-          {slots.length ? "Сохранить пожелания" : "Очистить пожелания"}
-        </button>
-      </div>
-    </details>
   );
 }

@@ -162,6 +162,8 @@ model SubscriptionOrder {
   receiptFileId        String?
   receiptFileName      String?
   receiptMimeType      String?
+  paymentClaimedAt     DateTime?
+  paymentFollowupSentAt DateTime?
   reviewedByTelegramId String?
   reviewedAt           DateTime?
   createdAt            DateTime   @default(now())
@@ -185,6 +187,8 @@ model TrainerOrder {
   receiptFileId        String?
   receiptFileName      String?
   receiptMimeType      String?
+  paymentClaimedAt     DateTime?
+  paymentFollowupSentAt DateTime?
   reviewedByTelegramId String?
   reviewedAt           DateTime?
   createdAt            DateTime @default(now())
@@ -414,6 +418,8 @@ model BotBooking {
   receiptFileId          String?
   receiptFileName        String?
   receiptMimeType        String?
+  paymentClaimedAt       DateTime?
+  paymentFollowupSentAt  DateTime?
   holdExpiresAt          DateTime
   reviewedByTelegramId   String?
   reviewedAt             DateTime?

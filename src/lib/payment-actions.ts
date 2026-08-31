@@ -11,7 +11,10 @@ import {
   rejectSubscriptionPayment,
   rejectTrainerPayment,
 } from "@/lib/payment-review";
-import { withChannelRecommendation } from "@/lib/payment-copy";
+import {
+  withChannelRecommendation,
+  withOfflineIndividualPolicy,
+} from "@/lib/payment-copy";
 import { sendTelegramMessage } from "@/lib/telegram-api";
 
 type PaymentKind = "booking" | "subscription" | "trainer";
@@ -73,7 +76,11 @@ export async function reviewPaymentInCrm(fd: FormData) {
     await sendTelegramMessage(
       result.order.telegramChatId,
       withChannelRecommendation(
-        `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+        withOfflineIndividualPolicy(
+          `Оплата подтверждена. Абонемент на ${result.order.totalLessons} занятий активирован до ${until}.`,
+          result.order.type,
+          result.order.format,
+        ),
       ),
     ).catch(() => undefined);
     revalidatePath(`/clients/${result.order.clientId}`);
