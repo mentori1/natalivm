@@ -166,7 +166,8 @@ export const BOT_CONTENT_DEFINITIONS = [
     group: "booking",
     label: "Ответ бартерному клиенту",
     defaultValue:
-      "Ваши занятия Наталья добавляет вручную. Напишите ей, пожалуйста, чтобы выбрать дату.",
+      "Вы записаны по бартеру: {{date}}, {{format}}. Оплата и списание занятий не требуются.",
+    hint: "{{date}}, {{format}}",
   },
   {
     key: "priceMissing",

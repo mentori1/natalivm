@@ -636,35 +636,37 @@ export async function createBooking(
   }
 
   const client = await syncTelegramClient(user);
-  if (client.status === "barter") {
-    await replaceScreen(
-      chatId,
-      copy.text("barterBooking"),
-    );
-    return;
-  }
-  const reserve = await prisma.botBooking.findFirst({
-    where: {
-      clientId: client.id,
-      status: "credit",
-      kind: { in: ["trial", "single"] },
-      holdExpiresAt: { gte: lesson.startsAt },
-      lesson: { type: lesson.type },
-    },
-    orderBy: { holdExpiresAt: "asc" },
-  });
-  const quote = reserve
+  const isBarter = client.status === "barter";
+  const reserve = isBarter
+    ? null
+    : await prisma.botBooking.findFirst({
+        where: {
+          clientId: client.id,
+          status: "credit",
+          kind: { in: ["trial", "single"] },
+          holdExpiresAt: { gte: lesson.startsAt },
+          lesson: { type: lesson.type },
+        },
+        orderBy: { holdExpiresAt: "asc" },
+      });
+  const quote = isBarter
     ? {
-        kind: reserve.kind,
-        tariffName: reserve.tariffName || "Занятие из запаса",
+        kind: "barter" as const,
+        tariffName: "Бартер",
         amount: 0,
       }
-    : await quoteForClient(
-        client.id,
-        lesson.type as "online" | "offline",
-        lesson.startsAt,
-        options.priceItemId,
-      );
+    : reserve
+      ? {
+          kind: reserve.kind,
+          tariffName: reserve.tariffName || "Занятие из запаса",
+          amount: 0,
+        }
+      : await quoteForClient(
+          client.id,
+          lesson.type as "online" | "offline",
+          lesson.startsAt,
+          options.priceItemId,
+        );
   const creditBookingId = reserve?.id;
   if (!quote) {
     await replaceScreen(
@@ -824,7 +826,7 @@ export async function createBooking(
     if (notifyChat) {
       await replaceScreen(
         chatId,
-        copy.text("subscriptionBooked", {
+        copy.text(isBarter ? "barterBooking" : "subscriptionBooked", {
           date: formatDateTime(lesson.startsAt),
           format: lesson.type === "online" ? "онлайн" : "офлайн",
         }),

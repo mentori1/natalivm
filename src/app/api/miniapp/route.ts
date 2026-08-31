@@ -225,7 +225,9 @@ export async function GET(req: NextRequest) {
       (item) => item.status === "credit" && item.holdExpiresAt > now,
     );
     const showGroupSchedule =
-      !hasOnlyIndividualSubscription || hasGroupBookingCredit;
+      fullClient.status === "barter" ||
+      !hasOnlyIndividualSubscription ||
+      hasGroupBookingCredit;
     const subscriptionPayments = await prisma.subscriptionOrder.findMany({
       where: {
         clientId: client.id,
@@ -900,7 +902,7 @@ export async function POST(req: NextRequest) {
       if (!Number.isInteger(lessonId) || lessonId < 1) {
         throw new Error("Занятие не выбрано");
       }
-      if (body.priceItemId) {
+      if (body.priceItemId && client.status !== "barter") {
         const selectedPrice = await prisma.priceItem.findFirst({
           where: { id: Number(body.priceItemId), active: true },
           select: { kind: true, type: true },
