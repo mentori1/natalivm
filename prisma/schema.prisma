@@ -104,6 +104,8 @@ model Subscription {
   unlimited      Boolean   @default(false) // без ограничения по числу занятий
   usedLessons    Int       @default(0) // использовано занятий
   pricePerLesson Float     @default(0) // цена за одно занятие, ₽
+  cashPaid       Float? // фактически получено деньгами; null = полная стоимость по старой логике
+  creditApplied  Float     @default(0) // зачтено из другого абонемента или внутреннего баланса
   expiresAt      DateTime // дата окончания срока (обычно +1.5 мес)
   frozen         Boolean   @default(false)
   frozenUntil    DateTime? // до какого числа заморожен

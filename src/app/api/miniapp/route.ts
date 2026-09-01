@@ -5,6 +5,7 @@ import {
   derivedSubStatus,
   formatDateTime,
   remaining,
+  subscriptionCashRevenue,
   TRAINER_PRICE_DEFAULT,
   TRAINER_PROFIT_DEFAULT,
 } from "@/lib/domain";
@@ -312,7 +313,7 @@ export async function GET(req: NextRequest) {
           id: item.id,
           title: item.tariffName || "Абонемент",
           detail: `${item.totalLessons} занятий · ${item.type === "online" ? "онлайн" : "офлайн"}`,
-          amount: Math.round(item.pricePerLesson * item.totalLessons),
+          amount: Math.round(subscriptionCashRevenue(item)),
           status: "confirmed",
           createdAt: item.purchasedAt.toISOString(),
           updatedAt: item.createdAt.toISOString(),

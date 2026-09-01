@@ -16,6 +16,8 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
+  subscriptionCashRevenue,
+  subscriptionFaceValue,
   pluralLessons,
   type SubType,
   type SubStatus,
@@ -144,10 +146,16 @@ export default async function SubscriptionPage({
             label="Стоимость"
             value={
               sub.pricePerLesson > 0
-                ? formatMoney(sub.totalLessons * sub.pricePerLesson)
+                ? formatMoney(subscriptionFaceValue(sub))
                 : "бартер"
             }
           />
+          {sub.creditApplied > 0 && (
+            <>
+              <Row label="Оплачено деньгами" value={formatMoney(subscriptionCashRevenue(sub))} />
+              <Row label="Зачтено остатком" value={formatMoney(sub.creditApplied)} />
+            </>
+          )}
           <Row label="Куплен" value={formatDate(sub.purchasedAt)} />
           <Row label="Действует до" value={sub.unlimited ? "Без срока" : formatDate(sub.expiresAt)} />
         </div>

@@ -11,6 +11,7 @@ import {
   formatMoney,
   formatDate,
   formatDateTime,
+  subscriptionCashRevenue,
   type SubType,
 } from "@/lib/domain";
 import { buttonClass, Card, SectionTitle } from "@/components/ui";
@@ -146,8 +147,8 @@ export default async function FinancePage({
       key: `s${s.id}`,
       clientId: s.clientId,
       name: s.client.fullName,
-      desc: `${SUB_TYPE[s.type as SubType].label}${s.tariffName ? ` · ${s.tariffName}` : ""} · ${s.totalLessons} занятий · ${formatDate(s.purchasedAt)}`,
-      amount: s.totalLessons * s.pricePerLesson,
+      desc: `${SUB_TYPE[s.type as SubType].label}${s.tariffName ? ` · ${s.tariffName}` : ""} · ${s.totalLessons} занятий${s.creditApplied > 0 ? ` · зачтено ${formatMoney(s.creditApplied)}` : ""} · ${formatDate(s.purchasedAt)}`,
+      amount: subscriptionCashRevenue(s),
       date: s.purchasedAt,
     })),
     ...singleVisits.map((v) => ({

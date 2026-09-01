@@ -8,6 +8,7 @@ import {
   normalizeHandle,
   normalizePhone,
   remaining,
+  subscriptionCashRevenue,
   TRAINER_PROFIT_DEFAULT,
   type ClientForReminders,
   type DuplicateMatch,
@@ -94,9 +95,11 @@ export function clientStats(subs: {
   totalLessons: number;
   usedLessons: number;
   pricePerLesson: number;
+  cashPaid?: number | null;
+  creditApplied?: number | null;
 }[]) {
   const visits = subs.reduce((s, x) => s + x.usedLessons, 0);
-  const spent = subs.reduce((s, x) => s + x.totalLessons * x.pricePerLesson, 0);
+  const spent = subs.reduce((s, x) => s + subscriptionCashRevenue(x), 0);
   return { visits, spent };
 }
 
@@ -151,7 +154,7 @@ export async function getDashboard() {
   const inMonth = (d: Date) => d >= mStart && d <= mEnd;
 
   const subsRevenue = subsThisMonth.reduce(
-    (s, x) => s + x.totalLessons * x.pricePerLesson,
+    (s, x) => s + subscriptionCashRevenue(x),
     0,
   );
   const singleRevenue = clients.reduce(
@@ -178,7 +181,7 @@ export async function getDashboard() {
   const allSubs = clients.flatMap((c) => c.subscriptions);
   const paidSubs = allSubs.filter((s) => s.pricePerLesson > 0);
   const paidChecks = [
-    ...paidSubs.map((item) => item.totalLessons * item.pricePerLesson),
+    ...paidSubs.map(subscriptionCashRevenue),
     ...botPaymentsThisMonth.map((item) => item.amount),
   ];
   const avgCheck =

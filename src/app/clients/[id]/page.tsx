@@ -23,6 +23,8 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
+  subscriptionCashRevenue,
+  subscriptionFaceValue,
   type SubStatus,
   type SubType,
 } from "@/lib/domain";
@@ -266,10 +268,15 @@ export default async function ClientCardPage({
                       Использовано {s.usedLessons}
                       {s.unlimited ? " · без ограничений" : ` из ${s.totalLessons}`} ·{" "}
                       {s.pricePerLesson > 0
-                        ? formatMoney(s.totalLessons * s.pricePerLesson)
+                        ? formatMoney(subscriptionFaceValue(s))
                         : "бартер"}{" "}
                       · {s.unlimited ? "без срока" : `до ${formatDate(s.expiresAt)}`}
                     </p>
+                    {s.creditApplied > 0 && (
+                      <p className="mt-1 text-xs font-medium text-brand-dark">
+                        Оплачено {formatMoney(subscriptionCashRevenue(s))} · зачтено {formatMoney(s.creditApplied)}
+                      </p>
+                    )}
                     {s.format === "individual" && (
                       <p className="mt-2 rounded-lg bg-brand-tint px-3 py-2 text-xs text-ink">
                         <span className="font-semibold">Удобное время: </span>

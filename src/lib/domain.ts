@@ -322,6 +322,23 @@ export interface SubLike {
   status: string;
 }
 
+export interface SubscriptionMoneyLike {
+  totalLessons: number;
+  pricePerLesson: number;
+  cashPaid?: number | null;
+  creditApplied?: number | null;
+}
+
+/** Полная стоимость абонемента по тарифу. */
+export function subscriptionFaceValue(sub: SubscriptionMoneyLike): number {
+  return sub.totalLessons * sub.pricePerLesson;
+}
+
+/** Фактический новый приход. Для старых записей равен полной стоимости. */
+export function subscriptionCashRevenue(sub: SubscriptionMoneyLike): number {
+  return sub.cashPaid ?? subscriptionFaceValue(sub);
+}
+
 export function remaining(sub: SubLike): number {
   if (sub.unlimited) return Number.MAX_SAFE_INTEGER;
   return Math.max(0, sub.totalLessons - sub.usedLessons);
