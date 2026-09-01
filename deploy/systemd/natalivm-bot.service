@@ -9,6 +9,7 @@ User=natalivm
 Group=natalivm
 WorkingDirectory=/srv/natalivm/current
 Environment=NODE_ENV=production
+EnvironmentFile=-/etc/natalivm/bot.env
 ExecStart=/usr/bin/npm run bot:poll
 Restart=always
 RestartSec=5
