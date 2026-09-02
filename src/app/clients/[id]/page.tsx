@@ -23,6 +23,7 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
+  pluralLessons,
   subscriptionCashRevenue,
   subscriptionFaceValue,
   type SubStatus,
@@ -187,27 +188,12 @@ export default async function ClientCardPage({
             )}
           </div>
         )}
-      </Card>
 
-      <Card className="p-5">
-        <PortalLinkCard clientId={client.id} />
+        <PortalLinkCard
+          clientId={client.id}
+          connected={Boolean(client.telegramUserId)}
+        />
       </Card>
-
-      {/* Статистика */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Посещений всего"
-          value={String(
-            visits + client.singleVisits.length + unmatchedAttendances.length,
-          )}
-        />
-        <Stat
-          label="Сумма покупок"
-          value={formatMoney(spent + singleSpent + trainerSpent + botSpent)}
-        />
-        <Stat label="Последнее занятие" value={formatDate(client.lastVisitAt)} />
-        <Stat label="Первый контакт" value={formatDate(client.firstContact)} />
-      </div>
 
       {/* Абонементы */}
       <section>
@@ -242,20 +228,27 @@ export default async function ClientCardPage({
                     href={`/subscriptions/${s.id}`}
                     className="-m-1 block rounded-xl p-1 transition-colors hover:bg-brand-tint"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-ink">
-                          {SUB_TYPE[s.type as SubType].label}
-                          {s.tariffName ? ` · ${s.tariffName}` : ""}
-                        </span>
-                        <Badge tone={SUB_STATUS[st as SubStatus].tone}>
-                          {SUB_STATUS[st as SubStatus].label}
-                        </Badge>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-ink">
+                            {SUB_TYPE[s.type as SubType].label}
+                            {s.tariffName ? ` · ${s.tariffName}` : ""}
+                          </span>
+                          <Badge tone={SUB_STATUS[st as SubStatus].tone}>
+                            {SUB_STATUS[st as SubStatus].label}
+                          </Badge>
+                        </div>
                       </div>
-                      <span className="flex items-center gap-0.5 text-sm font-semibold text-brand-dark">
-                        {s.unlimited ? "безлимит" : `осталось ${left}`}
-                        <IconChevronRight className="size-4 text-muted/50" />
-                      </span>
+                      <div className="shrink-0 rounded-xl bg-brand-tint px-3 py-2 text-right">
+                        <span className="block text-[10px] font-semibold uppercase text-muted">
+                          Осталось
+                        </span>
+                        <span className="mt-0.5 flex items-center justify-end gap-0.5 text-base font-bold text-brand-dark">
+                          {s.unlimited ? "Безлимит" : pluralLessons(left)}
+                          <IconChevronRight className="size-4 text-muted/50" />
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-line">
@@ -292,6 +285,22 @@ export default async function ClientCardPage({
           </div>
         )}
       </section>
+
+      {/* Статистика */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat
+          label="Посещений всего"
+          value={String(
+            visits + client.singleVisits.length + unmatchedAttendances.length,
+          )}
+        />
+        <Stat
+          label="Сумма покупок"
+          value={formatMoney(spent + singleSpent + trainerSpent + botSpent)}
+        />
+        <Stat label="Последнее занятие" value={formatDate(client.lastVisitAt)} />
+        <Stat label="Первый контакт" value={formatDate(client.firstContact)} />
+      </div>
 
       {/* Подтверждённые оплаты через Telegram-бота */}
       {client.botBookings.length > 0 && (

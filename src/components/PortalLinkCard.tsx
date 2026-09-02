@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { IconSend } from "@/components/icons";
 
-export function PortalLinkCard({ clientId }: { clientId: number }) {
+export function PortalLinkCard({
+  clientId,
+  connected,
+}: {
+  clientId: number;
+  connected: boolean;
+}) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22,7 +29,11 @@ export function PortalLinkCard({ clientId }: { clientId: number }) {
       }
       setUrl(result.url);
     } catch (linkError) {
-      setError(linkError instanceof Error ? linkError.message : "Не удалось создать ссылку");
+      setError(
+        linkError instanceof Error
+          ? linkError.message
+          : "Не удалось создать ссылку",
+      );
     } finally {
       setBusy(false);
     }
@@ -34,15 +45,36 @@ export function PortalLinkCard({ clientId }: { clientId: number }) {
   }
 
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="font-semibold text-ink">Подключение личного кабинета</p>
-        <p className="mt-1 text-sm text-muted">
-          Ссылка действует 7 дней и привязывает Telegram и аватар именно к этой карточке.
-        </p>
+    <div className="mt-4 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-brand">
+            <IconSend className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">
+              {connected ? "Telegram подключён" : "Подключить Telegram"}
+            </p>
+            <p className="text-xs text-muted">
+              {connected
+                ? "Можно создать новую ссылку"
+                : "Персональная ссылка на 7 дней"}
+            </p>
+          </div>
+        </div>
+        {!url && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void createLink()}
+            className="h-9 rounded-full bg-brand-tint px-3.5 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand-soft disabled:opacity-50"
+          >
+            {busy ? "Создаю…" : connected ? "Новая ссылка" : "Создать ссылку"}
+          </button>
+        )}
       </div>
-      {url ? (
-        <div className="flex flex-col gap-2 sm:flex-row">
+      {url && (
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             readOnly
             value={url}
@@ -56,17 +88,8 @@ export function PortalLinkCard({ clientId }: { clientId: number }) {
             {copied ? "Скопировано" : "Копировать"}
           </button>
         </div>
-      ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void createLink()}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-contrast disabled:opacity-50"
-        >
-          {busy ? "Создаю…" : "Создать персональную ссылку"}
-        </button>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   );
 }
