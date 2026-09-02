@@ -46,7 +46,7 @@ export function PortalLinkCard({
 
   return (
     <div className="mt-4 border-t border-line pt-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-brand">
             <IconSend className="size-4" />
@@ -67,9 +67,9 @@ export function PortalLinkCard({
             type="button"
             disabled={busy}
             onClick={() => void createLink()}
-            className="h-9 rounded-full bg-brand-tint px-3.5 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand-soft disabled:opacity-50"
+            className="h-9 shrink-0 rounded-full bg-brand-tint px-3.5 text-sm font-semibold text-brand-dark transition-colors hover:bg-brand-soft disabled:opacity-50"
           >
-            {busy ? "Создаю…" : connected ? "Новая ссылка" : "Создать ссылку"}
+            {busy ? "Создаю…" : connected ? "Обновить" : "Создать"}
           </button>
         )}
       </div>
